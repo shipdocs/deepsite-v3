@@ -300,7 +300,7 @@ export async function PUT(request: NextRequest) {
     const response = await client.chatCompletion(
       {
         model: selectedModel.value,
-        provider: selectedProvider,
+        provider: selectedProvider.provider,
         messages: [
           {
             role: "system",
@@ -326,9 +326,9 @@ export async function PUT(request: NextRequest) {
             content: prompt,
           },
         ],
-        ...(selectedProvider.id !== "sambanova"
+        ...(selectedProvider.provider !== "sambanova"
           ? {
-              max_tokens: selectedProvider.max_tokens,
+              max_tokens: 65_536,
             }
           : {}),
       },
