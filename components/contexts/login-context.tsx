@@ -13,6 +13,7 @@ interface LoginContextType {
 interface LoginModalOptions {
   pages?: Page[];
   title?: string;
+  prompt?: string;
   description?: string;
 }
 
@@ -44,8 +45,8 @@ export function LoginProvider({ children }: { children: ReactNode }) {
       <LoginModal
         open={isOpen}
         onClose={setIsOpen}
-        pages={modalOptions.pages}
         title={modalOptions.title}
+        prompt={modalOptions.prompt}
         description={modalOptions.description}
       />
     </LoginContext.Provider>

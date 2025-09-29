@@ -111,27 +111,36 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
     client.setQueryData(["ai.model"], newModel);
   };
 
-  const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined) => {
-    const response = await api.post("/me/projects", {
-      title: projectName,
-      pages: htmlPages,
-      prompt,
-    });
-    if (response.data.ok) {
+  const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined, isLoggedIn?: boolean) => {
+    if (isLoggedIn) {
+      const response = await api.post("/me/projects", {
+        title: projectName,
+        pages: htmlPages,
+        prompt,
+      });
+      if (response.data.ok) {
+        setIsAiWorking(false);
+        // Reset live preview when project is created
+        if (livePreviewRef?.current) {
+          livePreviewRef.current.reset();
+        }
+        router.replace(`/projects/${response.data.space.project.space_id}`);
+        setProject(response.data.space);
+        setProjects([...projects, response.data.space]);
+        toast.success("AI responded successfully");
+        if (audio.current) audio.current.play();
+      }
+    } else {
       setIsAiWorking(false);
-      // Reset live preview when project is created
       if (livePreviewRef?.current) {
         livePreviewRef.current.reset();
       }
-      router.replace(`/projects/${response.data.space.project.space_id}`);
-      setProject(response.data.space);
-      setProjects([...projects, response.data.space]);
       toast.success("AI responded successfully");
       if (audio.current) audio.current.play();
     }
   }
   
-  const callAiNewProject = async (prompt: string, enhancedSettings?: EnhancedSettings, redesignMarkdown?: string, handleThink?: (think: string) => void, onFinishThink?: () => void) => {
+  const callAiNewProject = async (prompt: string, enhancedSettings?: EnhancedSettings, redesignMarkdown?: string, isLoggedIn?: boolean) => {
     if (isAiWorking) return;
     if (!redesignMarkdown && !prompt.trim()) return;
     
@@ -160,16 +169,12 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
       if (request && request.body) {
         const reader = request.body.getReader();
         const decoder = new TextDecoder("utf-8");
-        const selectedModel = MODELS.find(
-          (m: { value: string }) => m.value === model
-        );
         let contentResponse = "";
 
         const read = async (): Promise<any> => {
           const { done, value } = await reader.read();
           
           if (done) {
-            // Check if the response is a JSON error message
             const trimmedResponse = contentResponse.trim();
             if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
               try {
@@ -196,7 +201,7 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
             const projectName = contentResponse.match(/<<<<<<< PROJECT_NAME_START ([\s\S]*?) >>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
             setPages(newPages);
             setLastSavedPages([...newPages]); // Mark initial pages as saved
-            createNewProject(prompt, newPages, projectName);
+            createNewProject(prompt, newPages, projectName, isLoggedIn);
             setPrompts([...prompts, prompt]);
 
             return { success: true, pages: newPages };
@@ -226,17 +231,6 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
               // Not a complete JSON yet, continue reading
             }
           }
-          
-          // if (selectedModel?.isThinker) {
-          //   const thinkMatch = contentResponse.match(/<think>[\s\S]*/)?.[0];
-          //   if (thinkMatch && !contentResponse?.includes("</think>")) {
-          //     handleThink?.(thinkMatch.replace("<think>", "").trim());
-          //   }
-          // }
-
-          // if (contentResponse.includes("</think>")) {
-          //   onFinishThink?.();
-          // }
 
           formatPages(contentResponse);
           

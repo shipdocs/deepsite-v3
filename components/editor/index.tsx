@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef, useState, useEffect } from "react";
-import { useCopyToClipboard, useMount } from "react-use";
+import { useCopyToClipboard, useLocalStorage, useMount } from "react-use";
 import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import classNames from "classnames";
@@ -18,6 +18,7 @@ import { Preview } from "./preview";
 import { SaveChangesPopup } from "./save-changes-popup";
 import Loading from "../loading";
 import { LivePreviewRef } from "./live-preview";
+import { Page } from "@/types";
 
 export const AppEditor = ({
   namespace,
@@ -43,6 +44,7 @@ export const AppEditor = ({
   const { isAiWorking } = useAi(undefined, livePreviewRef);
   const [, copyToClipboard] = useCopyToClipboard();
   const [showSavePopup, setShowSavePopup] = useState(false);
+  const [pagesStorage, , removePagesStorage] = useLocalStorage<Page[]>("pages");
 
   const monacoRef = useRef<any>(null);
   const editor = useRef<HTMLDivElement>(null);
@@ -50,12 +52,8 @@ export const AppEditor = ({
 
   useMount(() => {
     if (isNew) {
-      setPages([
-        {
-          path: "index.html",
-          html: defaultHTML,
-        },
-      ]);
+      setPages(pagesStorage || []);
+      removePagesStorage();
     }
   });
 

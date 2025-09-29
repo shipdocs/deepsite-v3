@@ -13,8 +13,6 @@ import Loading from "@/components/loading";
 import { api } from "@/lib/api";
 import { useAi } from "@/hooks/useAi";
 import { useEditor } from "@/hooks/useEditor";
-import { useUser } from "@/hooks/useUser";
-import { useLoginModal } from "@/components/contexts/login-context";
 
 export function ReImagine({
   onRedesign,
@@ -26,8 +24,6 @@ export function ReImagine({
   const [isLoading, setIsLoading] = useState(false);
   const { globalAiLoading } = useAi();
   const { globalEditorLoading } = useEditor();
-  const { user } = useUser();
-  const { openLoginModal } = useLoginModal();
 
   const checkIfUrlIsValid = (url: string) => {
     const urlPattern = new RegExp(
@@ -61,19 +57,6 @@ export function ReImagine({
     }
     setIsLoading(false);
   };
-
-  if (!user)
-    return (
-      <Button
-        size="xs"
-        variant="outline"
-        className="!rounded-md"
-        onClick={() => openLoginModal()}
-      >
-        <Paintbrush className="size-3.5" />
-        Redesign
-      </Button>
-    );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

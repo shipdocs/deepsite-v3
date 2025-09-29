@@ -66,7 +66,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let token = userToken;
+  let token: string | null = null;
+  if (userToken) token = userToken;
   let billTo: string | null = null;
 
   /**

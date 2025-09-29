@@ -33,7 +33,6 @@ export const AskAi = ({
 }) => {
   const { user, projects } = useUser();
   const { isSameHtml, isUploading, pages, isLoadingProject } = useEditor();
-  console.log("isSameHtml", isSameHtml);
   const {
     isAiWorking,
     isThinking,
@@ -57,7 +56,7 @@ export const AskAi = ({
 
   const [enhancedSettings, setEnhancedSettings, removeEnhancedSettings] =
     useLocalStorage<EnhancedSettings>("deepsite-enhancedSettings", {
-      isActive: true,
+      isActive: false,
       primaryColor: undefined,
       secondaryColor: undefined,
       theme: undefined,
@@ -65,7 +64,9 @@ export const AskAi = ({
   const [promptStorage, , removePromptStorage] = useLocalStorage("prompt", "");
 
   const [isFollowUp, setIsFollowUp] = useState(true);
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(
+    promptStorage && promptStorage.trim() !== "" ? promptStorage : ""
+  );
   const [think, setThink] = useState("");
   const [openThink, setOpenThink] = useState(false);
 
@@ -77,20 +78,19 @@ export const AskAi = ({
 
   useMount(() => {
     if (promptStorage && promptStorage.trim() !== "") {
-      setPrompt(promptStorage);
       callAi();
     }
   });
 
   const callAi = async (redesignMarkdown?: string) => {
-    if (!user) return openLoginModal();
     removePromptStorage();
-    if (!user.isPro && projects.length >= MAX_FREE_PROJECTS)
+    if (user && !user.isPro && projects.length >= MAX_FREE_PROJECTS)
       return openProModal([]);
     if (isAiWorking) return;
     if (!redesignMarkdown && !prompt.trim()) return;
 
     if (isFollowUp && !redesignMarkdown && !isSameHtml) {
+      if (!user) return openLoginModal({ prompt });
       const result = await callAiFollowUp(prompt, enhancedSettings, isNew);
 
       if (result?.error) {
@@ -106,10 +106,7 @@ export const AskAi = ({
         prompt,
         enhancedSettings,
         redesignMarkdown,
-        handleThink,
-        () => {
-          setIsThinking(false);
-        }
+        !!user
       );
 
       if (result?.error) {

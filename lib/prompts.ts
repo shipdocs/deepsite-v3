@@ -1,7 +1,7 @@
 export const SEARCH_START = "<<<<<<< SEARCH";
 export const DIVIDER = "=======";
 export const REPLACE_END = ">>>>>>> REPLACE";
-export const MAX_REQUESTS_PER_IP = 2;
+export const MAX_REQUESTS_PER_IP = 4;
 export const TITLE_PAGE_START = "<<<<<<< START_TITLE ";
 export const TITLE_PAGE_END = " >>>>>>> END_TITLE";
 export const NEW_PAGE_START = "<<<<<<< NEW_PAGE_START ";

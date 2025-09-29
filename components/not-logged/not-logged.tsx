@@ -1,13 +1,9 @@
 "use client";
 
-import { useUser } from "@/hooks/useUser";
-import { Button } from "@/components/ui/button";
 import { AnimatedBlobs } from "../animated-blobs";
-import { AnimatedText } from "../animated-text";
 import { FakeAskAi } from "../editor/ask-ai/fake-ask";
 
 export const NotLogged = () => {
-  const { openLoginWindow } = useUser();
   return (
     <section className="relative max-w-[86rem] mx-auto">
       <header className="container mx-auto pt-20 px-6 relative flex flex-col items-center justify-center text-center">

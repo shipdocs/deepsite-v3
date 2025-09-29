@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useUpdateEffect } from "react-use";
+import { useLocalStorage, useMount, useUpdateEffect } from "react-use";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -12,7 +12,6 @@ import { isTheSameHtml } from "@/lib/compare-html-diff";
 export const useEditor = (namespace?: string, repoId?: string) => {
   const client = useQueryClient();
   const router = useRouter();
-  // const [pagesStorage,, removePagesStorage] = useLocalStorage<Page[]>("pages");
 
   const { data: project, isFetching: isLoadingProject } = useQuery({
     queryKey: ["editor.project"],

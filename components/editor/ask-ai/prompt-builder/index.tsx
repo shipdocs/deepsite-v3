@@ -11,8 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ContentModal } from "./content-modal";
-import { useLoginModal } from "@/components/contexts/login-context";
-import { useUser } from "@/hooks/useUser";
 import { EnhancedSettings } from "@/types";
 
 export const PromptBuilder = ({
@@ -22,8 +20,6 @@ export const PromptBuilder = ({
   enhancedSettings: EnhancedSettings;
   setEnhancedSettings: (settings: EnhancedSettings) => void;
 }) => {
-  const { user } = useUser();
-  const { openLoginModal } = useLoginModal();
   const { globalAiLoading } = useAi();
   const { globalEditorLoading } = useEditor();
 
@@ -36,7 +32,6 @@ export const PromptBuilder = ({
         className="!rounded-md !border-white/10 !bg-gradient-to-r from-sky-400/15 to-purple-400/15 light-sweep hover:brightness-110"
         disabled={globalAiLoading || globalEditorLoading}
         onClick={() => {
-          if (!user) return openLoginModal();
           setOpen(true);
         }}
       >

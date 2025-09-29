@@ -4,23 +4,29 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useUser } from "@/hooks/useUser";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
 import { Page } from "@/types";
+import { useEditor } from "@/hooks/useEditor";
 
 export const LoginModal = ({
   open,
-  pages,
   onClose,
   title = "Log In to use DeepSite for free",
   description = "Log In through your Hugging Face account to continue using DeepSite and increase your monthly free limit.",
+  prompt,
 }: {
   open: boolean;
-  pages?: Page[];
   onClose: React.Dispatch<React.SetStateAction<boolean>>;
   title?: string;
   description?: string;
+  prompt?: string;
 }) => {
   const { openLoginWindow } = useUser();
+  const { pages } = useEditor();
   const [, setStorage] = useLocalStorage("pages");
+  const [, setPromptStorage] = useLocalStorage("prompt", "");
   const handleClick = async () => {
+    if (prompt) {
+      setPromptStorage(prompt);
+    }
     if (pages && !isTheSameHtml(pages[0].html)) {
       setStorage(pages);
     }
