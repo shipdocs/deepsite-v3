@@ -76,7 +76,16 @@ export function Settings({
           disabled={globalAiLoading}
           size="xs"
         >
-          <Brain className="size-3.5" />
+          {/* <Brain className="size-3.5" /> */}
+          {selectedModel?.logo && (
+            <Image
+              src={selectedModel?.logo}
+              alt={selectedModel.label}
+              className={`size-3.5 ${open ? "" : "filter invert"}`}
+              width={20}
+              height={20}
+            />
+          )}
           <span className="truncate max-w-[120px]">
             {isMounted
               ? selectedModel?.label?.split(" ").join("-").toLowerCase()

@@ -18,6 +18,7 @@ import {
   UPDATE_PAGE_END,
   PROMPT_FOR_PROJECT_NAME,
 } from "@/lib/prompts";
+import { calculateMaxTokens, estimateInputTokens, getProviderSpecificConfig } from "@/lib/max-tokens";
 import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 import { Page } from "@/types";
 import { createRepo, RepoDesignation, uploadFiles } from "@huggingface/hub";
@@ -25,6 +26,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { getBestProvider } from "@/lib/best-provider";
 import { rewritePrompt } from "@/lib/rewrite-prompt";
 import { COLORS } from "@/lib/utils";
+import { templates } from "@/lib/templates";
 
 const ipAddresses = new Map();
 
@@ -122,6 +124,21 @@ export async function POST(request: NextRequest) {
       // let completeResponse = "";
       try {
         const client = new InferenceClient(token);
+        
+        // Calculate dynamic max_tokens based on provider and input size
+        const systemPrompt = INITIAL_SYSTEM_PROMPT + (enhancedSettings.isActive ? `
+Here are some examples of designs that you can inspire from: 
+${templates.map((template) => `- ${template}`).join("\n")}
+IMPORTANT: Use the templates as inspiration, but do not copy them exactly.
+Try to create a unique design, based on the templates, but not exactly like them, mostly depending on the user's prompt. These are just examples, do not copy them exactly.
+` : "");
+        
+        const userPrompt = `${rewrittenPrompt}${redesignMarkdown ? `\n\nHere is my current design as a markdown:\n\n${redesignMarkdown}\n\nNow, please create a new design based on this markdown. Use the images in the markdown.` : ""} : ""}`;
+        
+        const estimatedInputTokens = estimateInputTokens(systemPrompt, userPrompt);
+        const dynamicMaxTokens = calculateMaxTokens(selectedProvider, estimatedInputTokens, true);
+        const providerConfig = getProviderSpecificConfig(selectedProvider, dynamicMaxTokens);
+        
         const chatCompletion = client.chatCompletionStream(
           {
             model: selectedModel.value,
@@ -129,14 +146,14 @@ export async function POST(request: NextRequest) {
             messages: [
               {
                 role: "system",
-                content: INITIAL_SYSTEM_PROMPT,
+                content: systemPrompt,
               },
               {
                 role: "user",
-                content: `${rewrittenPrompt}${redesignMarkdown ? `\n\nHere is my current design as a markdown:\n\n${redesignMarkdown}\n\nNow, please create a new design based on this markdown. Use the images in the markdown.` : ""} : ""}`
+                content: userPrompt
               },
             ],
-            max_tokens: 65_536,
+            ...providerConfig,
           },
           billTo ? { billTo } : {}
         );
@@ -297,6 +314,21 @@ export async function PUT(request: NextRequest) {
   const selectedProvider = await getBestProvider(selectedModel.value, provider)
 
   try {
+    // Calculate dynamic max_tokens for PUT request
+    const systemPrompt = FOLLOW_UP_SYSTEM_PROMPT + (isNew ? PROMPT_FOR_PROJECT_NAME : "");
+    const userContext = previousPrompts
+      ? `Also here are the previous prompts:\n\n${previousPrompts.map((p: string) => `- ${p}`).join("\n")}`
+      : "You are modifying the HTML file based on the user's request.";
+    const assistantContext = `${
+      selectedElementHtml
+        ? `\n\nYou have to update ONLY the following element, NOTHING ELSE: \n\n\`\`\`html\n${selectedElementHtml}\n\`\`\` Could be in multiple pages, if so, update all the pages.`
+        : ""
+    }. Current pages: ${pages?.map((p: Page) => `- ${p.path} \n${p.html}`).join("\n")}. ${files?.length > 0 ? `Current images: ${files?.map((f: string) => `- ${f}`).join("\n")}.` : ""}`;
+    
+    const estimatedInputTokens = estimateInputTokens(systemPrompt, prompt, userContext + assistantContext);
+    const dynamicMaxTokens = calculateMaxTokens(selectedProvider, estimatedInputTokens, false);
+    const providerConfig = getProviderSpecificConfig(selectedProvider, dynamicMaxTokens);
+    
     const response = await client.chatCompletion(
       {
         model: selectedModel.value,
@@ -304,33 +336,22 @@ export async function PUT(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: FOLLOW_UP_SYSTEM_PROMPT + (isNew ? PROMPT_FOR_PROJECT_NAME : ""),
+            content: systemPrompt,
           },
           {
             role: "user",
-            content: previousPrompts
-              ? `Also here are the previous prompts:\n\n${previousPrompts.map((p: string) => `- ${p}`).join("\n")}`
-              : "You are modifying the HTML file based on the user's request.",
+            content: userContext,
           },
           {
             role: "assistant",
-
-            content: `${
-              selectedElementHtml
-                ? `\n\nYou have to update ONLY the following element, NOTHING ELSE: \n\n\`\`\`html\n${selectedElementHtml}\n\`\`\` Could be in multiple pages, if so, update all the pages.`
-                : ""
-            }. Current pages: ${pages?.map((p: Page) => `- ${p.path} \n${p.html}`).join("\n")}. ${files?.length > 0 ? `Current images: ${files?.map((f: string) => `- ${f}`).join("\n")}.` : ""}`,
+            content: assistantContext,
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        ...(selectedProvider.provider !== "sambanova"
-          ? {
-              max_tokens: 65_536,
-            }
-          : {}),
+        ...providerConfig,
       },
       billTo ? { billTo } : {}
     );

@@ -4,6 +4,7 @@ import { useUser } from "@/hooks/useUser";
 import { Button } from "@/components/ui/button";
 import { AnimatedBlobs } from "../animated-blobs";
 import { AnimatedText } from "../animated-text";
+import { FakeAskAi } from "../editor/ask-ai/fake-ask";
 
 export const NotLogged = () => {
   const { openLoginWindow } = useUser();
@@ -21,10 +22,7 @@ export const NotLogged = () => {
           Access the most simple and powerful AI Vibe Code Editor to create your
           next project.
         </p>
-        <Button size="xl" variant="default" onClick={openLoginWindow}>
-          Log In to Continue
-        </Button>
-        <div className="mt-14 max-w-2xl w-full mx-auto">{/* <AskAi /> */}</div>
+        <FakeAskAi />
         <AnimatedBlobs />
       </header>
       <div id="features" className="min-h-screen py-20 px-6 relative">

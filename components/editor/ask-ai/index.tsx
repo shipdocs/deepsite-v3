@@ -1,20 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import classNames from "classnames";
-import {
-  ArrowUp,
-  ChevronDown,
-  CircleStop,
-  Pause,
-  Plus,
-  Square,
-  StopCircle,
-} from "lucide-react";
-import { useLocalStorage, useUpdateEffect } from "react-use";
+import { ArrowUp, ChevronDown, CircleStop } from "lucide-react";
+import { useLocalStorage, useUpdateEffect, useMount } from "react-use";
 import { toast } from "sonner";
 
 import { useAi } from "@/hooks/useAi";
 import { useEditor } from "@/hooks/useEditor";
-import { isTheSameHtml } from "@/lib/compare-html-diff";
 import { EnhancedSettings, Project } from "@/types";
 import { SelectedFiles } from "@/components/editor/ask-ai/selected-files";
 import { SelectedHtmlElement } from "@/components/editor/ask-ai/selected-html-element";
@@ -28,7 +19,6 @@ import { useUser } from "@/hooks/useUser";
 import { useLoginModal } from "@/components/contexts/login-context";
 import { Settings } from "./settings";
 import { useProModal } from "@/components/contexts/pro-context";
-import { MODELS } from "@/lib/providers";
 import { MAX_FREE_PROJECTS } from "@/lib/utils";
 
 export const AskAi = ({
@@ -71,6 +61,7 @@ export const AskAi = ({
       secondaryColor: undefined,
       theme: undefined,
     });
+  const [promptStorage, , removePromptStorage] = useLocalStorage("prompt", "");
 
   const [isFollowUp, setIsFollowUp] = useState(true);
   const [prompt, setPrompt] = useState("");
@@ -83,8 +74,16 @@ export const AskAi = ({
     setOpenThink(true);
   };
 
+  useMount(() => {
+    if (promptStorage && promptStorage.trim() !== "") {
+      setPrompt(promptStorage);
+      callAi();
+    }
+  });
+
   const callAi = async (redesignMarkdown?: string) => {
     if (!user) return openLoginModal();
+    removePromptStorage();
     if (!user.isPro && projects.length >= MAX_FREE_PROJECTS)
       return openProModal([]);
     if (isAiWorking) return;

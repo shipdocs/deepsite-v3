@@ -1,5 +1,6 @@
+"use client";
 import Loading from "@/components/loading";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useInterval } from "react-use";
 
 const TEXTS = [
@@ -23,8 +24,16 @@ export const AiLoading = ({
   className?: string;
 }) => {
   const [selectedText, setSelectedText] = useState(
-    text ?? TEXTS[Math.floor(Math.random() * TEXTS.length)]
+    text ?? TEXTS[0] // Start with first text to avoid hydration issues
   );
+
+  // Set random text on client-side only to avoid hydration mismatch
+  useEffect(() => {
+    if (!text) {
+      setSelectedText(TEXTS[Math.floor(Math.random() * TEXTS.length)]);
+    }
+  }, [text]);
+
   useInterval(() => {
     if (!text) {
       if (selectedText === TEXTS[TEXTS.length - 1]) {

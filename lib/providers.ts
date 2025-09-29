@@ -1,37 +1,34 @@
+import DeepSeekLogo from "@/assets/deepseek.svg";
+import QwenLogo from "@/assets/qwen.svg";
+import KimiLogo from "@/assets/kimi.svg";
+
 export const PROVIDERS = {
   "fireworks-ai": {
     name: "Fireworks AI",
-    max_tokens: 131_000,
     id: "fireworks-ai",
   },
   nebius: {
     name: "Nebius AI Studio",
-    max_tokens: 131_000,
     id: "nebius",
   },
   sambanova: {
     name: "SambaNova",
-    max_tokens: 32_000,
     id: "sambanova",
   },
   novita: {
     name: "NovitaAI",
-    max_tokens: 16_000,
     id: "novita",
   },
   hyperbolic: {
     name: "Hyperbolic",
-    max_tokens: 131_000,
     id: "hyperbolic",
   },
   together: {
     name: "Together AI",
-    max_tokens: 128_000,
     id: "together",
   },
   groq: {
     name: "Groq",
-    max_tokens: 16_384,
     id: "groq",
   },
 };
@@ -42,6 +39,7 @@ export const MODELS = [
     label: "DeepSeek V3 O324",
     providers: ["fireworks-ai", "nebius", "sambanova", "novita", "hyperbolic"],
     autoProvider: "novita",
+    logo: DeepSeekLogo,
   },
   // {
   //   value: "deepseek-ai/DeepSeek-R1-0528",
@@ -62,31 +60,42 @@ export const MODELS = [
     label: "Qwen3 Coder 480B A35B Instruct",
     providers: ["novita", "hyperbolic"],
     autoProvider: "novita",
+    logo: QwenLogo,
   },
   {
     value: "moonshotai/Kimi-K2-Instruct",
     label: "Kimi K2 Instruct",
     providers: ["together", "novita", "groq"],
     autoProvider: "groq",
+    logo: KimiLogo,
   },
   {
     value: "deepseek-ai/DeepSeek-V3.1",
     label: "DeepSeek V3.1",
     providers: ["fireworks-ai", "novita"],
     autoProvider: "fireworks-ai",
+    logo: DeepSeekLogo,
   },
   {
     value: "moonshotai/Kimi-K2-Instruct-0905",
     label: "Kimi K2 Instruct 0905",
     providers: ["together", "groq", "novita"],
-    isNew: true,
-    autoProvider: "groq"
+    autoProvider: "groq",
+    logo: KimiLogo,
   },
   {
     value: "deepseek-ai/DeepSeek-V3.1-Terminus",
     label: "DeepSeek V3.1 Terminus",
     providers: ["novita"],
     autoProvider: "novita",
+    logo: DeepSeekLogo,
+  },
+  {
+    value: "deepseek-ai/DeepSeek-V3.2-Exp",
+    label: "DeepSeek V3.2 Exp",
+    providers: ["novita"],
+    autoProvider: "novita",
+    logo: DeepSeekLogo,
     isNew: true,
   }
 ];
