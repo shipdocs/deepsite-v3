@@ -71,7 +71,7 @@ export function ProjectCard({
                 "/",
                 "-"
               )}.static.hf.space`}
-              className="w-[1200px] h-[675px] border-0 origin-top-left"
+              className="w-[1200px] h-[675px] border-0 origin-top-left pointer-events-none"
               style={{
                 transform: "scale(0.5)",
                 transformOrigin: "top left",

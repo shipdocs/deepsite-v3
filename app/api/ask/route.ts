@@ -24,7 +24,7 @@ import { Page } from "@/types";
 import { createRepo, RepoDesignation, uploadFiles } from "@huggingface/hub";
 import { isAuthenticated } from "@/lib/auth";
 import { getBestProvider } from "@/lib/best-provider";
-import { rewritePrompt } from "@/lib/rewrite-prompt";
+// import { rewritePrompt } from "@/lib/rewrite-prompt";
 import { COLORS } from "@/lib/utils";
 import { templates } from "@/lib/templates";
 

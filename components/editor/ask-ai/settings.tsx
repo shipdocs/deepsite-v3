@@ -20,8 +20,10 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { useUpdateEffect } from "react-use";
 import Image from "next/image";
-import { Brain, CheckCheck, ChevronDown } from "lucide-react";
+import { Brain, BrainIcon, CheckCheck, ChevronDown } from "lucide-react";
 import { useAi } from "@/hooks/useAi";
+import { getProviders } from "@/lib/get-providers";
+import Loading from "@/components/loading";
 
 export function Settings({
   open,
@@ -43,26 +45,24 @@ export function Settings({
     globalAiLoading,
   } = useAi();
   const [isMounted, setIsMounted] = useState(false);
+  const [loadingProviders, setLoadingProviders] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const modelAvailableProviders = useMemo(() => {
-    const availableProviders = MODELS.find(
-      (m: { value: string }) => m.value === model
-    )?.providers;
-    if (!availableProviders) return Object.keys(PROVIDERS);
-    return Object.keys(PROVIDERS).filter((id) =>
-      availableProviders.includes(id)
-    );
-  }, [model]);
+  // const modelAvailableProviders = useMemo(() => {
+  //   const availableProviders = MODELS.find(
+  //     (m: { value: string }) => m.value === model
+  //   )?.providers;
+  //   if (!availableProviders) return Object.keys(PROVIDERS);
+  //   return Object.keys(PROVIDERS).filter((id) =>
+  //     availableProviders.includes(id)
+  //   );
+  // }, [model]);
 
   useUpdateEffect(() => {
-    if (
-      provider !== "auto" &&
-      !modelAvailableProviders.includes(provider as string)
-    ) {
+    if (provider !== "auto" && !providers.includes(provider as string)) {
       setProvider("auto");
     }
   }, [model, provider]);
@@ -85,13 +85,41 @@ export function Settings({
     return lists;
   }, [MODELS]);
 
+  const [providers, setProviders] = useState<any[]>([]);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadProviders = async () => {
+      setLoadingProviders(true);
+      if (!model) {
+        setProviders([]);
+        return;
+      }
+      try {
+        const result = await getProviders(model);
+        setProviders(result);
+      } catch (error) {
+        console.error("Failed to load providers:", error);
+        setProviders([]);
+      } finally {
+        setLoadingProviders(false);
+      }
+    };
+
+    loadProviders();
+  }, [model]);
+
+  const handleImageError = (providerId: string) => {
+    setFailedImages((prev) => new Set([...prev, providerId]));
+  };
+
   return (
     <Popover open={open} onOpenChange={onClose}>
       <PopoverTrigger asChild>
         <Button
           variant={open ? "default" : "outline"}
           className="!rounded-md"
-          disabled={globalAiLoading}
+          disabled={globalAiLoading || loadingProviders}
           size="xs"
         >
           {/* <Brain className="size-3.5" /> */}
@@ -219,29 +247,38 @@ export function Settings({
               <p className="text-neutral-300 text-sm mb-2">
                 Inference Provider
               </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {modelAvailableProviders.map((id: string) => (
-                  <Button
-                    key={id}
-                    variant={id === provider ? "default" : "secondary"}
-                    size="sm"
-                    onClick={() => {
-                      setProvider(id);
-                    }}
-                  >
-                    <Image
-                      src={`/providers/${id}.svg`}
-                      alt={PROVIDERS[id as keyof typeof PROVIDERS].name}
-                      className="size-5 mr-2"
-                      width={20}
-                      height={20}
-                    />
-                    {PROVIDERS[id as keyof typeof PROVIDERS].name}
-                    {id === provider && (
-                      <CheckCheck className="ml-2 size-4 text-blue-500" />
-                    )}
-                  </Button>
-                ))}
+              <div className="grid grid-cols-2 gap-1.5 relative">
+                {loadingProviders ? (
+                  <Loading overlay={false} />
+                ) : (
+                  providers.map((id: string) => (
+                    <Button
+                      key={id}
+                      variant={id === provider ? "default" : "secondary"}
+                      size="sm"
+                      onClick={() => {
+                        setProvider(id);
+                      }}
+                    >
+                      {failedImages.has(id) ? (
+                        <BrainIcon className="size-4 mr-2" />
+                      ) : (
+                        <Image
+                          src={`/providers/${id}.svg`}
+                          alt={id}
+                          className="size-5 mr-2"
+                          width={20}
+                          height={20}
+                          onError={() => handleImageError(id)}
+                        />
+                      )}
+                      {PROVIDERS?.[id as keyof typeof PROVIDERS]?.name || id}
+                      {id === provider && (
+                        <CheckCheck className="ml-2 size-4 text-blue-500" />
+                      )}
+                    </Button>
+                  ))
+                )}
               </div>
             </label>
           </div>
