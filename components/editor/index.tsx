@@ -58,7 +58,7 @@ export const AppEditor = ({
   });
 
   useEffect(() => {
-    if (hasUnsavedChanges && !isAiWorking && project?.name) {
+    if (hasUnsavedChanges && !isAiWorking && project?.space_id) {
       setShowSavePopup(true);
     } else {
       setShowSavePopup(false);
