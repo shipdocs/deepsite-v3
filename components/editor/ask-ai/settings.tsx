@@ -198,12 +198,12 @@ export function Settings({
               </SelectContent>
             </Select>
           </label>
-          {isFollowUp && (
+          {/* {isFollowUp && (
             <div className="bg-amber-500/10 border-amber-500/10 p-3 text-xs text-amber-500 border rounded-lg">
               Note: You can&apos;t use a Thinker model for follow-up requests.
               We automatically switch to the default model for you.
             </div>
-          )}
+          )} */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div>

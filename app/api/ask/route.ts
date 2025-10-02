@@ -331,7 +331,7 @@ export async function PUT(request: NextRequest) {
     const dynamicMaxTokens = calculateMaxTokens(selectedProvider, estimatedInputTokens, false);
     const providerConfig = getProviderSpecificConfig(selectedProvider, dynamicMaxTokens);
     
-    const response = await client.chatCompletion(
+    const chatCompletion = client.chatCompletionStream(
       {
         model: selectedModel.value,
         provider: selectedProvider.provider,
@@ -358,7 +358,18 @@ export async function PUT(request: NextRequest) {
       billTo ? { billTo } : {}
     );
 
-    const chunk = response.choices[0]?.message?.content;
+    let chunk = "";
+    while (true) {
+      const { done, value } = await chatCompletion.next();
+      if (done) {
+        break;
+      }
+
+      const deltaContent = value.choices[0]?.delta?.content;
+      if (deltaContent) {
+        chunk += deltaContent;
+      }
+    }
     if (!chunk) {
       return NextResponse.json(
         { ok: false, message: "No content returned from the model" },

@@ -12,7 +12,7 @@ export const getBestProvider = async (model: string, provider?: string) => {
   } else {
     const providerData = data.providers.find((p: any) => p.provider === provider)
     if (providerData?.status === "live") {
-      bestProvider = providerData.provider
+      bestProvider = providerData
     } else {
       bestProvider = data.providers?.find((p: any) => p.status === "live")
     }
