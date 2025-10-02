@@ -110,7 +110,7 @@ export const useUser = (initialData?: {
             router.push(currentRoute);
             removeCurrentRoute();
           } else {
-            router.push("/projects");
+            router.push("/");
           }
           toast.success("Login successful");
         }

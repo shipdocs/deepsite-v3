@@ -45,13 +45,11 @@ export const UserMenu = ({ className }: { className?: string }) => {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem
-            onClick={() => (window.location.href = "/projects/new")}
-          >
+          <DropdownMenuItem onClick={() => (window.location.href = "/new")}>
             <CirclePlus className="size-4 text-neutral-100" />
             New Project
           </DropdownMenuItem>
-          <Link href="/projects">
+          <Link href="/">
             <DropdownMenuItem>
               <FolderCode className="size-4 text-neutral-100" />
               View Projects

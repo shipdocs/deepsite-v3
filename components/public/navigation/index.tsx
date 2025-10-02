@@ -16,7 +16,7 @@ import { ProTag } from "@/components/pro-modal";
 const navigationLinks = [
   {
     name: "Create Website",
-    href: "/projects/new",
+    href: "/new",
   },
   {
     name: "Features",

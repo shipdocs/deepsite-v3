@@ -49,7 +49,7 @@ export function ProjectCard({
   return (
     <div className="text-neutral-200 space-y-4 group cursor-pointer">
       <Link
-        href={`/projects/${project.name}`}
+        href={`/${project.name}`}
         className="relative bg-neutral-900 rounded-2xl overflow-hidden h-64 lg:h-44 w-full flex items-center justify-end flex-col px-3 border border-neutral-800"
       >
         {project.private ? (

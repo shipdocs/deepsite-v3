@@ -31,7 +31,7 @@ export const useEditor = (namespace?: string, repoId?: string) => {
         return project;
       } catch (error: any) {
         toast.error(error.response.data.error);
-        router.push("/projects");
+        router.push("/");
         return null;
       }
     },

@@ -124,7 +124,7 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
         if (livePreviewRef?.current) {
           livePreviewRef.current.reset();
         }
-        router.replace(`/projects/${response.data.space.project.space_id}`);
+        router.replace(`/${response.data.space.project.space_id}`);
         setProject(response.data.space);
         setProjects([...projects, response.data.space]);
         toast.success("AI responded successfully");
@@ -315,7 +315,7 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
         ) as HTMLIFrameElement;
 
         if (isNew && res.repoId) {
-          router.push(`/projects/${res.repoId}`);
+          router.push(`/${res.repoId}`);
           setIsAiWorking(false);
         } else {
           setPages(res.pages);

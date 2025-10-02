@@ -26,7 +26,7 @@ export const FakeAskAi = () => {
 
   const callAi = async () => {
     setPromptStorage(prompt);
-    router.push("/projects/new");
+    router.push("/new");
   };
 
   const randomPrompt = () => {

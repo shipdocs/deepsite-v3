@@ -10,7 +10,7 @@ export const NotLogged = () => {
         <div className="rounded-full border border-sky-100/10 bg-gradient-to-r from-sky-500/15 to-sky-sky-500/5 text-sm text-sky-300 px-3 py-1 max-w-max mx-auto mb-2">
           ✨ DeepSite v3 is out!
         </div>
-        <h1 className="text-5xl lg:text-6xl font-semibold text-white font-mono max-w-4xl">
+        <h1 className="text-5xl lg:text-7xl font-semibold text-white font-mono max-w-4xl">
           Welcome to DeepSite
         </h1>
         <p className="text-white/70 text-xl mt-3 mb-8">
