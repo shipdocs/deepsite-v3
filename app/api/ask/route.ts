@@ -216,6 +216,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  console.log("PUT request received");
   const user = await isAuthenticated();
   if (user instanceof NextResponse || !user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
