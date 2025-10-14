@@ -17,7 +17,6 @@ import { AskAi } from "./ask-ai";
 import { Preview } from "./preview";
 import { SaveChangesPopup } from "./save-changes-popup";
 import Loading from "../loading";
-import { LivePreviewRef } from "./live-preview";
 import { Page } from "@/types";
 
 export const AppEditor = ({
@@ -40,8 +39,7 @@ export const AppEditor = ({
     saveChanges,
     pages,
   } = useEditor(namespace, repoId);
-  const livePreviewRef = useRef<LivePreviewRef>(null);
-  const { isAiWorking } = useAi(undefined, livePreviewRef);
+  const { isAiWorking } = useAi();
   const [, copyToClipboard] = useCopyToClipboard();
   const [showSavePopup, setShowSavePopup] = useState(false);
   const [pagesStorage, , removePagesStorage] = useLocalStorage<Page[]>("pages");
@@ -136,7 +134,7 @@ export const AppEditor = ({
             }}
           />
         </div>
-        <Preview ref={livePreviewRef} isNew={isNew} />
+        <Preview isNew={isNew} />
       </main>
 
       {/* Save Changes Popup */}

@@ -9,10 +9,9 @@ import { Page, EnhancedSettings } from "@/types";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useUser } from "./useUser";
-import { LivePreviewRef } from "@/components/editor/live-preview";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
 
-export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefObject<LivePreviewRef | null>) => {
+export const useAi = (onScrollToBottom?: () => void) => {
   const client = useQueryClient();
   const audio = useRef<HTMLAudioElement | null>(null);
   const { setPages, setCurrentPage, setPrompts, prompts, pages, project, setProject, commits, setCommits, setLastSavedPages, isSameHtml } = useEditor();
@@ -121,10 +120,6 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
       });
       if (response.data.ok) {
         setIsAiWorking(false);
-        // Reset live preview when project is created
-        if (livePreviewRef?.current) {
-          livePreviewRef.current.reset();
-        }
         router.replace(`/${response.data.space.project.space_id}`);
         setProject(response.data.space);
         setProjects([...projects, response.data.space]);
@@ -133,9 +128,6 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
       }
     } else {
       setIsAiWorking(false);
-      if (livePreviewRef?.current) {
-        livePreviewRef.current.reset();
-      }
       toast.success("AI responded successfully");
       if (audio.current) audio.current.play();
     }
@@ -479,10 +471,6 @@ export const useAi = (onScrollToBottom?: () => void, livePreviewRef?: React.RefO
     }
     setIsAiWorking(false);
     setIsThinking(false);
-    // Reset live preview when request is aborted
-    if (livePreviewRef?.current) {
-      livePreviewRef.current.reset();
-    }
   };
 
   const selectedModel = useMemo(() => {
