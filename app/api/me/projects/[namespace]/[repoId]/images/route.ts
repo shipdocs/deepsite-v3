@@ -39,22 +39,22 @@ export async function POST(
       );
     }
 
-    // Parse the FormData to get the images
+    // Parse the FormData to get the media files
     const formData = await req.formData();
-    const imageFiles = formData.getAll("images") as File[];
+    const mediaFiles = formData.getAll("images") as File[];
 
-    if (!imageFiles || imageFiles.length === 0) {
+    if (!mediaFiles || mediaFiles.length === 0) {
       return NextResponse.json(
         {
           ok: false,
-          error: "At least one image file is required under the 'images' key",
+          error: "At least one media file is required under the 'images' key",
         },
         { status: 400 }
       );
     }
 
     const files: File[] = [];
-    for (const file of imageFiles) {
+    for (const file of mediaFiles) {
       if (!(file instanceof File)) {
         return NextResponse.json(
           {
@@ -65,18 +65,30 @@ export async function POST(
         );
       }
 
-      if (!file.type.startsWith('image/')) {
+      // Check if file is a supported media type
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      const isAudio = file.type.startsWith('audio/');
+      
+      if (!isImage && !isVideo && !isAudio) {
         return NextResponse.json(
           {
             ok: false,
-            error: `File ${file.name} is not an image`,
+            error: `File ${file.name} is not a supported media type (image, video, or audio)`,
           },
           { status: 400 }
         );
       }
 
-      // Create File object with images/ folder prefix
-      const fileName = `images/${file.name}`;
+      // Create File object with appropriate folder prefix
+      let folderPrefix = 'images/';
+      if (isVideo) {
+        folderPrefix = 'videos/';
+      } else if (isAudio) {
+        folderPrefix = 'audio/';
+      }
+      
+      const fileName = `${folderPrefix}${file.name}`;
       const processedFile = new File([file], fileName, { type: file.type });
       files.push(processedFile);
     }
@@ -91,21 +103,21 @@ export async function POST(
       repo,
       files,
       accessToken: user.token as string,
-      commitTitle: `Upload ${files.length} image(s)`,
+      commitTitle: `Upload ${files.length} media file(s)`,
     });
 
     return NextResponse.json({ 
       ok: true, 
-      message: `Successfully uploaded ${files.length} image(s) to ${namespace}/${repoId}/images/`,
+      message: `Successfully uploaded ${files.length} media file(s) to ${namespace}/${repoId}/`,
       uploadedFiles: files.map((file) => `https://huggingface.co/spaces/${namespace}/${repoId}/resolve/main/${file.name}`),
     }, { status: 200 });
 
   } catch (error) {
-    console.error('Error uploading images:', error);
+    console.error('Error uploading media files:', error);
     return NextResponse.json(
       {
         ok: false,
-        error: "Failed to upload images",
+        error: "Failed to upload media files",
       },
       { status: 500 }
     );

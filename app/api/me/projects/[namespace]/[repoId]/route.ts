@@ -105,7 +105,7 @@ export async function GET(
     const htmlFiles: Page[] = [];
     const files: string[] = [];
 
-    const allowedFilesExtensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "avif", "heic", "heif", "ico", "bmp", "tiff", "tif"];
+    const allowedFilesExtensions = ["jpg", "jpeg", "png", "gif", "svg", "webp", "avif", "heic", "heif", "ico", "bmp", "tiff", "tif", "mp4", "webm", "ogg", "avi", "mov", "mp3", "wav", "ogg", "aac", "m4a"];
     
     for await (const fileInfo of listFiles({repo, accessToken: user.token as string})) {
       if (fileInfo.path.endsWith(".html")) {
@@ -126,7 +126,7 @@ export async function GET(
           });
         }
       }
-      if (fileInfo.type === "directory" && fileInfo.path === "images") {
+      if (fileInfo.type === "directory" && ["videos", "images", "audio"].includes(fileInfo.path)) {
         for await (const imageInfo of listFiles({repo, accessToken: user.token as string, path: fileInfo.path})) {
           if (allowedFilesExtensions.includes(imageInfo.path.split(".").pop() || "")) {
             files.push(`https://huggingface.co/spaces/${namespace}/${repoId}/resolve/main/${imageInfo.path}`);

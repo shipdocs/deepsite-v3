@@ -191,13 +191,15 @@ export const useEditor = (namespace?: string, repoId?: string) => {
 
   const uploadFilesMutation = useMutation({
     mutationFn: async ({ files, project }: { files: FileList; project: Project }) => {
-      const images = Array.from(files).filter((file) => {
-        return file.type.startsWith("image/");
+      const mediaFiles = Array.from(files).filter((file) => {
+        return file.type.startsWith("image/") || 
+               file.type.startsWith("video/") || 
+               file.type.startsWith("audio/");
       });
 
       const data = new FormData();
-      images.forEach((image) => {
-        data.append("images", image);
+      mediaFiles.forEach((file) => {
+        data.append("images", file); // Keep using "images" key for backward compatibility
       });
 
       const response = await fetch(
