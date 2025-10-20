@@ -81,9 +81,9 @@
   const icon = document.createElement('img');
   icon.src = 'https://deepsite.hf.co/logo.svg';
   icon.alt = 'DeepSite';
-  icon.style.marginRight = '8px';
-  icon.style.width = '20px';
-  icon.style.height = '20px';
+  icon.style.marginRight = '6px';
+  icon.style.width = '16px';
+  icon.style.height = '16px';
   icon.style.filter = 'brightness(0) invert(1)';
   
   // Create text
@@ -98,7 +98,7 @@
     color: '#ffffff',
     borderRadius: '9999px',
     background: 'rgba(0, 0, 0, 0.4)',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '500',
     display: 'inline-block',
     cursor: 'pointer',
@@ -111,7 +111,7 @@
   // Apply styles to inner badge (like span element)
   Object.assign(badgeInner.style, {
     background: 'rgba(0, 0, 0, 0.6)',
-    padding: '10px 20px',
+    padding: '8px 16px',
     display: 'flex',
     alignItems: 'center',
     borderRadius: '9999px',
