@@ -1,4 +1,11 @@
-import { ArrowRight, HelpCircle, RefreshCcw, Lock } from "lucide-react";
+import {
+  ArrowRight,
+  HelpCircle,
+  RefreshCcw,
+  Lock,
+  Eye,
+  Sparkles,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -82,15 +89,24 @@ export function Header() {
         <div className="flex items-center gap-2">
           {project?.space_id && (
             <Link
-              href={`https://huggingface.co/spaces/${project.space_id}`}
+              href={
+                project?.private
+                  ? `https://huggingface.co/spaces/${project.space_id}`
+                  : `https://${project.space_id.replaceAll(
+                      "/",
+                      "-"
+                    )}.static.hf.space`
+              }
               target="_blank"
             >
               <Button
                 size="xs"
                 variant="bordered"
-                className="flex items-center gap-1 justify-center border-gray-200/20 bg-gray-200/10 text-gray-200 max-lg:hidden"
+                className="flex items-center gap-1.5 justify-center bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 border-emerald-500/30 text-emerald-400 hover:text-emerald-300 backdrop-blur-sm shadow-lg hover:shadow-emerald-500/20 transition-all duration-300 max-lg:hidden font-medium"
               >
+                <Eye className="size-3.5" />
                 See Live Preview
+                <Sparkles className="size-3" />
               </Button>
             </Link>
           )}

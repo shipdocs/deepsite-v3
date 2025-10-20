@@ -15,6 +15,7 @@ import { Uploader } from "@/components/editor/ask-ai/uploader";
 import { ReImagine } from "@/components/editor/ask-ai/re-imagine";
 import { Selector } from "@/components/editor/ask-ai/selector";
 import { PromptBuilder } from "@/components/editor/ask-ai/prompt-builder";
+import { Context } from "@/components/editor/ask-ai/context";
 import { useUser } from "@/hooks/useUser";
 import { useLoginModal } from "@/components/contexts/login-context";
 import { Settings } from "./settings";
@@ -41,11 +42,8 @@ export const AskAi = ({
     setSelectedFiles,
     selectedElement,
     setSelectedElement,
-    setIsThinking,
     callAiNewProject,
     callAiFollowUp,
-    setModel,
-    selectedModel,
     audio: hookAudio,
     cancelRequest,
   } = useAi(onScrollToBottom);
@@ -112,9 +110,6 @@ export const AskAi = ({
 
       if (result?.success) {
         setPrompt("");
-        // if (selectedModel?.isThinker) {
-        //   setModel(MODELS[0].value);
-        // }
       }
     }
   };
@@ -284,10 +279,14 @@ export const AskAi = ({
         </div>
         <div className="flex items-center justify-between gap-2 px-4 pb-3 mt-2">
           <div className="flex-1 flex items-center justify-start gap-1.5 flex-wrap">
-            <PromptBuilder
-              enhancedSettings={enhancedSettings!}
-              setEnhancedSettings={setEnhancedSettings}
-            />
+            {isNew ? (
+              <PromptBuilder
+                enhancedSettings={enhancedSettings!}
+                setEnhancedSettings={setEnhancedSettings}
+              />
+            ) : (
+              <Context />
+            )}
             <Settings
               open={openProvider}
               error={providerError}

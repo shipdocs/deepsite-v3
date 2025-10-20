@@ -14,12 +14,13 @@ import { isTheSameHtml } from "@/lib/compare-html-diff";
 export const useAi = (onScrollToBottom?: () => void) => {
   const client = useQueryClient();
   const audio = useRef<HTMLAudioElement | null>(null);
-  const { setPages, setCurrentPage, setPrompts, prompts, pages, project, setProject, commits, setCommits, setLastSavedPages, isSameHtml } = useEditor();
+  const { setPages, setCurrentPage, setPreviewPage, setPrompts, prompts, pages, project, setProject, commits, setCommits, setLastSavedPages, isSameHtml } = useEditor();
   const [controller, setController] = useState<AbortController | null>(null);
   const [storageProvider, setStorageProvider] = useLocalStorage("provider", "auto");
   const [storageModel, setStorageModel] = useLocalStorage("model", MODELS[0].value);
   const router = useRouter();
   const { projects, setProjects } = useUser();
+  const streamingPagesRef = useRef<Set<string>>(new Set());
 
   const { data: isAiWorking = false } = useQuery({
     queryKey: ["ai.isAiWorking"],
@@ -78,6 +79,18 @@ export const useAi = (onScrollToBottom?: () => void) => {
     client.setQueryData(["ai.selectedFiles"], newFiles)
   };
 
+  const { data: contextFile } = useQuery<string | null>({
+    queryKey: ["ai.contextFile"],
+    queryFn: async () => null,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    initialData: null
+  });
+  const setContextFile = (newContextFile: string | null) => {
+    client.setQueryData(["ai.contextFile"], newContextFile)
+  };
+
   const { data: provider } = useQuery({
     queryKey: ["ai.provider"],
     queryFn: async () => storageProvider ?? "auto",
@@ -113,19 +126,25 @@ export const useAi = (onScrollToBottom?: () => void) => {
 
   const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined, isLoggedIn?: boolean) => {
     if (isLoggedIn) {
-      const response = await api.post("/me/projects", {
+      api.post("/me/projects", {
         title: projectName,
         pages: htmlPages,
         prompt,
-      });
-      if (response.data.ok) {
+      })
+      .then((response) => {
+        if (response.data.ok) {
+          setIsAiWorking(false);
+          router.replace(`/${response.data.space.project.space_id}`);
+          setProject(response.data.space);
+          setProjects([...projects, response.data.space]);
+          toast.success("AI responded successfully");
+          if (audio.current) audio.current.play();
+        }
+      })
+      .catch((error) => {
         setIsAiWorking(false);
-        router.replace(`/${response.data.space.project.space_id}`);
-        setProject(response.data.space);
-        setProjects([...projects, response.data.space]);
-        toast.success("AI responded successfully");
-        if (audio.current) audio.current.play();
-      }
+        toast.error(error?.response?.data?.message || error?.message || "Failed to create project");
+      });
     } else {
       setIsAiWorking(false);
       toast.success("AI responded successfully");
@@ -138,6 +157,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
     if (!redesignMarkdown && !prompt.trim()) return;
     
     setIsAiWorking(true);
+    streamingPagesRef.current.clear(); // Reset tracking for new generation
     
     const abortController = new AbortController();
     setController(abortController);
@@ -186,12 +206,11 @@ export const useAi = (onScrollToBottom?: () => void) => {
                   }
                 }
               } catch (e) {
-                // Not valid JSON, treat as normal content
               }
             }
             
-            const newPages = formatPages(contentResponse);
-            let projectName = contentResponse.match(/<<<<<<< PROJECT_NAME_START ([\s\S]*?) >>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
+            const newPages = formatPages(contentResponse, false);
+            let projectName = contentResponse.match(/<<<<<<< PROJECT_NAME_START\s*([\s\S]*?)\s*>>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
             if (!projectName) {
               projectName = prompt.substring(0, 40).replace(/[^a-zA-Z0-9]/g, "-").slice(0, 40);
             }
@@ -226,13 +245,11 @@ export const useAi = (onScrollToBottom?: () => void) => {
                 }
               }
             } catch (e) {
-              // Not a complete JSON yet, continue reading
             }
           }
 
-          formatPages(contentResponse);
+          formatPages(contentResponse, true);
           
-          // Continue reading
           return read();
         };
 
@@ -266,6 +283,10 @@ export const useAi = (onScrollToBottom?: () => void) => {
     setController(abortController);
     
     try {
+      const pagesToSend = contextFile 
+        ? pages.filter(page => page.path === contextFile)
+        : pages;
+
       const request = await fetch("/api/ask", {
         method: "PUT",
         body: JSON.stringify({
@@ -273,7 +294,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
           provider,
           previousPrompts: prompts,
           model,
-          pages,
+          pages: pagesToSend,
           selectedElementHtml: selectedElement?.outerHTML,
           files: selectedFiles,
           repoId: project?.space_id,
@@ -316,16 +337,28 @@ export const useAi = (onScrollToBottom?: () => void) => {
           router.push(`/${res.repoId}`);
           setIsAiWorking(false);
         } else {
-          setPages(res.pages);
-          setLastSavedPages([...res.pages]); // Mark AI changes as saved
+          const returnedPages = res.pages as Page[];
+          const updatedPagesMap = new Map(returnedPages.map((p: Page) => [p.path, p]));
+          const mergedPages: Page[] = pages.map(page => 
+            updatedPagesMap.has(page.path) ? updatedPagesMap.get(page.path)! : page
+          );
+          returnedPages.forEach((page: Page) => {
+            if (!pages.find(p => p.path === page.path)) {
+              mergedPages.push(page);
+            }
+          });
+          
+          setPages(mergedPages);
+          setLastSavedPages([...mergedPages]);
           setCommits([res.commit, ...commits]);
           setPrompts(
             [...prompts, prompt]
           )
           setSelectedElement(null);
           setSelectedFiles([]);
+          // setContextFile(null); not needed yet, keep context for the next request.
           setIsEditableModeEnabled(false);
-          setIsAiWorking(false); // This was missing!
+          setIsAiWorking(false);
         }
 
         if (audio.current) audio.current.play();
@@ -348,35 +381,36 @@ export const useAi = (onScrollToBottom?: () => void) => {
     }
   };
 
-  const formatPages = (content: string) => {
+  const formatPages = (content: string, isStreaming: boolean = true) => {
     const pages: Page[] = [];
-    if (!content.match(/<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/)) {
+    if (!content.match(/<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/)) {
       return pages;
     }
 
     const cleanedContent = content.replace(
-      /[\s\S]*?<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/,
-      "<<<<<<< START_TITLE $1 >>>>>>> END_TITLE"
+      /[\s\S]*?<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/,
+      "<<<<<<< NEW_FILE_START $1 >>>>>>> NEW_FILE_END"
     );
-    const htmlChunks = cleanedContent.split(
-      /<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/
+    const fileChunks = cleanedContent.split(
+      /<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/
     );
     const processedChunks = new Set<number>();
 
-    htmlChunks.forEach((chunk, index) => {
+    fileChunks.forEach((chunk, index) => {
       if (processedChunks.has(index) || !chunk?.trim()) {
         return;
       }
-      const htmlContent = extractHtmlContent(htmlChunks[index + 1]);
+      const filePath = chunk.trim();
+      const fileContent = extractFileContent(fileChunks[index + 1], filePath);
 
-      if (htmlContent) {
+      if (fileContent) {
         const page: Page = {
-          path: chunk.trim(),
-          html: htmlContent,
+          path: filePath,
+          html: fileContent,
         };
         pages.push(page);
 
-        if (htmlContent.length > 200) {
+        if (fileContent.length > 200) {
           onScrollToBottom?.();
         }
 
@@ -386,68 +420,82 @@ export const useAi = (onScrollToBottom?: () => void) => {
     });
     if (pages.length > 0) {
       setPages(pages);
-      const lastPagePath = pages[pages.length - 1]?.path;
-      setCurrentPage(lastPagePath || "index.html");
+      if (isStreaming) {
+        // Find new pages that haven't been shown yet (HTML, CSS, JS, etc.)
+        const newPages = pages.filter(p => 
+          !streamingPagesRef.current.has(p.path)
+        );
+        
+        if (newPages.length > 0) {
+          const newPage = newPages[0];
+          setCurrentPage(newPage.path);
+          streamingPagesRef.current.add(newPage.path);
+          
+          // Update preview if it's an HTML file not in components folder
+          if (newPage.path.endsWith('.html') && !newPage.path.includes('/components/')) {
+            setPreviewPage(newPage.path);
+          }
+        }
+      } else {
+        streamingPagesRef.current.clear();
+        const indexPage = pages.find(p => p.path === 'index.html' || p.path === 'index' || p.path === '/');
+        if (indexPage) {
+          setCurrentPage(indexPage.path);
+        }
+      }
     }
 
     return pages;
   };
 
-  const formatPage = (content: string, currentPagePath: string) => {
-    if (!content.match(/<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/)) {
-      return null;
-    }
-
-    const cleanedContent = content.replace(
-      /[\s\S]*?<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/,
-      "<<<<<<< START_TITLE $1 >>>>>>> END_TITLE"
-    );
-
-    const htmlChunks = cleanedContent.split(
-      /<<<<<<< START_TITLE (.*?) >>>>>>> END_TITLE/
-    )?.filter(Boolean);
-
-    const pagePath = htmlChunks[0]?.trim() || "";
-    const htmlContent = extractHtmlContent(htmlChunks[1]);
-
-    if (!pagePath || !htmlContent) {
-      return null;
-    }
-
-    const page: Page = {
-      path: pagePath,
-      html: htmlContent,
-    };
-
-    setPages(prevPages => {
-      const existingPageIndex = prevPages.findIndex(p => p.path === currentPagePath || p.path === pagePath);
-      
-      if (existingPageIndex !== -1) {
-        const updatedPages = [...prevPages];
-        updatedPages[existingPageIndex] = page;
-        return updatedPages;
-      } else {
-        return [...prevPages, page];
-      }
-    });
-
-    setCurrentPage(pagePath);
-
-    if (htmlContent.length > 200) {
-      onScrollToBottom?.();
-    }
-
-    return page;
-  };
-
-  const extractHtmlContent = (chunk: string): string => {
+  const extractFileContent = (chunk: string, filePath: string): string => {
     if (!chunk) return "";
-    const htmlMatch = chunk.trim().match(/<!DOCTYPE html>[\s\S]*/);
-    if (!htmlMatch) return "";
-    let htmlContent = htmlMatch[0];
-    htmlContent = ensureCompleteHtml(htmlContent);
-    htmlContent = htmlContent.replace(/```/g, "");
-    return htmlContent;
+    
+    // Remove backticks first
+    let content = chunk.trim();
+    
+    // Handle different file types
+    if (filePath.endsWith('.css')) {
+      // Try to extract CSS from complete code blocks first
+      const cssMatch = content.match(/```css\s*([\s\S]*?)\s*```/);
+      if (cssMatch) {
+        content = cssMatch[1];
+      } else {
+        // Handle incomplete code blocks during streaming (remove opening fence)
+        content = content.replace(/^```css\s*/i, "");
+      }
+      // Remove any remaining backticks
+      return content.replace(/```/g, "").trim();
+    } else if (filePath.endsWith('.js')) {
+      // Try to extract JavaScript from complete code blocks first
+      const jsMatch = content.match(/```(?:javascript|js)\s*([\s\S]*?)\s*```/);
+      if (jsMatch) {
+        content = jsMatch[1];
+      } else {
+        // Handle incomplete code blocks during streaming (remove opening fence)
+        content = content.replace(/^```(?:javascript|js)\s*/i, "");
+      }
+      // Remove any remaining backticks
+      return content.replace(/```/g, "").trim();
+    } else {
+      // Handle HTML files
+      const htmlMatch = content.match(/```html\s*([\s\S]*?)\s*```/);
+      if (htmlMatch) {
+        content = htmlMatch[1];
+      } else {
+        // Handle incomplete code blocks during streaming (remove opening fence)
+        content = content.replace(/^```html\s*/i, "");
+        // Try to find HTML starting with DOCTYPE
+        const doctypeMatch = content.match(/<!DOCTYPE html>[\s\S]*/);
+        if (doctypeMatch) {
+          content = doctypeMatch[0];
+        }
+      }
+      
+      let htmlContent = content.replace(/```/g, "");
+      htmlContent = ensureCompleteHtml(htmlContent);
+      return htmlContent;
+    }
   };
 
   const ensureCompleteHtml = (html: string): string => {
@@ -488,6 +536,8 @@ export const useAi = (onScrollToBottom?: () => void) => {
     setSelectedElement,
     selectedFiles,
     setSelectedFiles,
+    contextFile,
+    setContextFile,
     isEditableModeEnabled,
     setIsEditableModeEnabled,
     globalAiLoading: isThinking || isAiWorking,

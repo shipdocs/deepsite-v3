@@ -98,6 +98,17 @@ export const useEditor = (namespace?: string, repoId?: string) => {
     client.setQueryData(["editor.currentPage"], newCurrentPage);
   };
 
+  const { data: previewPage = "" } = useQuery({
+    queryKey: ["editor.previewPage"],
+    queryFn: async () => "",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+  const setPreviewPage = (newPreviewPage: string) => {
+    client.setQueryData(["editor.previewPage"], newPreviewPage);
+  };
+
   const { data: prompts = [] } = useQuery({
     queryKey: ["editor.prompts"],
     queryFn: async () => [],
@@ -338,6 +349,8 @@ export const useEditor = (namespace?: string, repoId?: string) => {
     setDevice,
     currentPage,
     setCurrentPage,
+    previewPage,
+    setPreviewPage,
     currentPageData,
     currentTab,
     setCurrentTab,

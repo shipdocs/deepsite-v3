@@ -10,12 +10,12 @@ import {
   FOLLOW_UP_SYSTEM_PROMPT,
   INITIAL_SYSTEM_PROMPT,
   MAX_REQUESTS_PER_IP,
-  NEW_PAGE_END,
-  NEW_PAGE_START,
+  NEW_FILE_END,
+  NEW_FILE_START,
   REPLACE_END,
   SEARCH_START,
-  UPDATE_PAGE_START,
-  UPDATE_PAGE_END,
+  UPDATE_FILE_START,
+  UPDATE_FILE_END,
   PROMPT_FOR_PROJECT_NAME,
 } from "@/lib/prompts";
 import { calculateMaxTokens, estimateInputTokens, getProviderSpecificConfig } from "@/lib/max-tokens";
@@ -27,6 +27,7 @@ import { getBestProvider } from "@/lib/best-provider";
 // import { rewritePrompt } from "@/lib/rewrite-prompt";
 import { COLORS } from "@/lib/utils";
 import { templates } from "@/lib/templates";
+import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 
 const ipAddresses = new Map();
 
@@ -192,11 +193,9 @@ export async function POST(request: NextRequest) {
           );
         }
       } finally {
-        // Ensure the writer is always closed, even if already closed
         try {
           await writer?.close();
         } catch {
-          // Ignore errors when closing the writer as it might already be closed
         }
       }
     })();
@@ -216,7 +215,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  console.log("PUT request received");
   const user = await isAuthenticated();
   if (user instanceof NextResponse || !user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -225,7 +223,7 @@ export async function PUT(request: NextRequest) {
   const authHeaders = await headers();
 
   const body = await request.json();
-  const { prompt, previousPrompts, provider, selectedElementHtml, model, pages, files, repoId: repoIdFromBody, isNew, enhancedSettings } =
+  const { prompt, provider, selectedElementHtml, model, pages, files, repoId: repoIdFromBody, isNew } =
     body;
 
   let repoId = repoIdFromBody;
@@ -301,7 +299,6 @@ export async function PUT(request: NextRequest) {
     const systemPrompt = FOLLOW_UP_SYSTEM_PROMPT + (isNew ? PROMPT_FOR_PROJECT_NAME : "");
     const userContext = "You are modifying the HTML file based on the user's request.";
     
-    // Send all pages without filtering
     const allPages = pages || [];
     const pagesContext = allPages
       .map((p: Page) => `- ${p.path}\n${p.html}`)
@@ -368,18 +365,18 @@ export async function PUT(request: NextRequest) {
       let newHtml = "";
       const updatedPages = [...(pages || [])];
 
-      const updatePageRegex = new RegExp(`${UPDATE_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${UPDATE_PAGE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
-      let updatePageMatch;
+      const updateFileRegex = new RegExp(`${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${UPDATE_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
+      let updateFileMatch;
       
-      while ((updatePageMatch = updatePageRegex.exec(chunk)) !== null) {
-        const [, pagePath, pageContent] = updatePageMatch;
+      while ((updateFileMatch = updateFileRegex.exec(chunk)) !== null) {
+        const [, filePath, fileContent] = updateFileMatch;
         
-        const pageIndex = updatedPages.findIndex(p => p.path === pagePath);
+        const pageIndex = updatedPages.findIndex(p => p.path === filePath);
         if (pageIndex !== -1) {
           let pageHtml = updatedPages[pageIndex].html;
           
-          let processedContent = pageContent;
-          const htmlMatch = pageContent.match(/```html\s*([\s\S]*?)\s*```/);
+          let processedContent = fileContent;
+          const htmlMatch = fileContent.match(/```html\s*([\s\S]*?)\s*```/);
           if (htmlMatch) {
             processedContent = htmlMatch[1];
           }
@@ -438,40 +435,48 @@ export async function PUT(request: NextRequest) {
 
           updatedPages[pageIndex].html = pageHtml;
           
-          if (pagePath === '/' || pagePath === '/index' || pagePath === 'index') {
+          if (filePath === '/' || filePath === '/index' || filePath === 'index' || filePath === 'index.html') {
             newHtml = pageHtml;
           }
         }
       }
 
-      const newPageRegex = new RegExp(`${NEW_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${NEW_PAGE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_PAGE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
-      let newPageMatch;
+      const newFileRegex = new RegExp(`${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${NEW_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
+      let newFileMatch;
       
-      while ((newPageMatch = newPageRegex.exec(chunk)) !== null) {
-        const [, pagePath, pageContent] = newPageMatch;
+      while ((newFileMatch = newFileRegex.exec(chunk)) !== null) {
+        const [, filePath, fileContent] = newFileMatch;
         
-        let pageHtml = pageContent;
-        const htmlMatch = pageContent.match(/```html\s*([\s\S]*?)\s*```/);
+        let fileData = fileContent;
+        // Try to extract content from code blocks
+        const htmlMatch = fileContent.match(/```html\s*([\s\S]*?)\s*```/);
+        const cssMatch = fileContent.match(/```css\s*([\s\S]*?)\s*```/);
+        const jsMatch = fileContent.match(/```javascript\s*([\s\S]*?)\s*```/);
+        
         if (htmlMatch) {
-          pageHtml = htmlMatch[1];
+          fileData = htmlMatch[1];
+        } else if (cssMatch) {
+          fileData = cssMatch[1];
+        } else if (jsMatch) {
+          fileData = jsMatch[1];
         }
         
-        const existingPageIndex = updatedPages.findIndex(p => p.path === pagePath);
+        const existingFileIndex = updatedPages.findIndex(p => p.path === filePath);
         
-        if (existingPageIndex !== -1) {
-          updatedPages[existingPageIndex] = {
-            path: pagePath,
-            html: pageHtml.trim()
+        if (existingFileIndex !== -1) {
+          updatedPages[existingFileIndex] = {
+            path: filePath,
+            html: fileData.trim()
           };
         } else {
           updatedPages.push({
-            path: pagePath,
-            html: pageHtml.trim()
+            path: filePath,
+            html: fileData.trim()
           });
         }
       }
 
-      if (updatedPages.length === pages?.length && !chunk.includes(UPDATE_PAGE_START)) {
+      if (updatedPages.length === pages?.length && !chunk.includes(UPDATE_FILE_START)) {
         let position = 0;
         let moreBlocks = true;
 
@@ -525,7 +530,6 @@ export async function PUT(request: NextRequest) {
           position = replaceEndIndex + REPLACE_END.length;
         }
 
-        // Update the main HTML if it's the index page
         const mainPageIndex = updatedPages.findIndex(p => p.path === '/' || p.path === '/index' || p.path === 'index');
         if (mainPageIndex !== -1) {
           updatedPages[mainPageIndex].html = newHtml;
@@ -534,12 +538,23 @@ export async function PUT(request: NextRequest) {
 
       const files: File[] = [];
       updatedPages.forEach((page: Page) => {
-        const file = new File([page.html], page.path, { type: "text/html" });
+        let mimeType = "text/html";
+        if (page.path.endsWith(".css")) {
+          mimeType = "text/css";
+        } else if (page.path.endsWith(".js")) {
+          mimeType = "text/javascript";
+        } else if (page.path.endsWith(".json")) {
+          mimeType = "application/json";
+        }
+        const content = (mimeType === "text/html" && isIndexPage(page.path)) 
+          ? injectDeepSiteBadge(page.html) 
+          : page.html;
+        const file = new File([content], page.path, { type: mimeType });
         files.push(file);
       });
 
       if (isNew) {
-        const projectName = chunk.match(/<<<<<<< PROJECT_NAME_START ([\s\S]*?) >>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
+        const projectName = chunk.match(/<<<<<<< PROJECT_NAME_START\s*([\s\S]*?)\s*>>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
         const formattedTitle = projectName?.toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .split("-")

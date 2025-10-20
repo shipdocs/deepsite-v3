@@ -4,6 +4,7 @@ import { RepoDesignation, createRepo, listCommits, spaceInfo, uploadFiles } from
 import { isAuthenticated } from "@/lib/auth";
 import { Commit, Page } from "@/types";
 import { COLORS } from "@/lib/utils";
+import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 
 export async function POST(
   req: NextRequest,
@@ -50,7 +51,20 @@ This project was created with [DeepSite](https://deepsite.hf.co).
   const readmeFile = new File([README], "README.md", { type: "text/markdown" });
   files.push(readmeFile);
   pages.forEach((page: Page) => {
-    const file = new File([page.html], page.path, { type: "text/html" });
+    // Determine MIME type based on file extension
+    let mimeType = "text/html";
+    if (page.path.endsWith(".css")) {
+      mimeType = "text/css";
+    } else if (page.path.endsWith(".js")) {
+      mimeType = "text/javascript";
+    } else if (page.path.endsWith(".json")) {
+      mimeType = "application/json";
+    }
+    // Inject the DeepSite badge script into index pages only (not components or other HTML files)
+    const content = (mimeType === "text/html" && isIndexPage(page.path)) 
+      ? injectDeepSiteBadge(page.html) 
+      : page.html;
+    const file = new File([content], page.path, { type: mimeType });
     files.push(file);
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useUpdateEffect } from "react-use";
 import classNames from "classnames";
 
@@ -28,7 +28,8 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     pages,
     setPages,
     setCurrentPage,
-    isSameHtml,
+    previewPage,
+    setPreviewPage,
   } = useEditor();
   const {
     isEditableModeEnabled,
@@ -48,70 +49,213 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
   const [throttledHtml, setThrottledHtml] = useState<string>("");
   const lastUpdateTimeRef = useRef<number>(0);
 
-  // For new projects, throttle HTML updates to every 3 seconds
   useEffect(() => {
-    if (isNew && currentPageData?.html) {
+    if (!previewPage && pages.length > 0) {
+      const indexPage = pages.find(
+        (p) => p.path === "index.html" || p.path === "index" || p.path === "/"
+      );
+      const firstHtmlPage = pages.find((p) => p.path.endsWith(".html"));
+      setPreviewPage(indexPage?.path || firstHtmlPage?.path || "index.html");
+    }
+  }, [pages, previewPage]);
+
+  const previewPageData = useMemo(() => {
+    const found = pages.find((p) => {
+      const normalizedPagePath = p.path.replace(/^\.?\//, "");
+      const normalizedPreviewPage = previewPage.replace(/^\.?\//, "");
+      return normalizedPagePath === normalizedPreviewPage;
+    });
+    return found || currentPageData;
+  }, [pages, previewPage, currentPageData]);
+
+  const injectAssetsIntoHtml = useCallback(
+    (html: string): string => {
+      if (!html) return html;
+
+      // Find all CSS and JS files (including those in subdirectories)
+      const cssFiles = pages.filter(
+        (p) => p.path.endsWith(".css") && p.path !== previewPageData?.path
+      );
+      const jsFiles = pages.filter(
+        (p) => p.path.endsWith(".js") && p.path !== previewPageData?.path
+      );
+
+      let modifiedHtml = html;
+
+      // Inject all CSS files
+      if (cssFiles.length > 0) {
+        const allCssContent = cssFiles
+          .map(
+            (file) =>
+              `<style data-injected-from="${file.path}">\n${file.html}\n</style>`
+          )
+          .join("\n");
+
+        if (modifiedHtml.includes("</head>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "</head>",
+            `${allCssContent}\n</head>`
+          );
+        } else if (modifiedHtml.includes("<head>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "<head>",
+            `<head>\n${allCssContent}`
+          );
+        } else {
+          // If no head tag, prepend to document
+          modifiedHtml = allCssContent + "\n" + modifiedHtml;
+        }
+
+        // Remove all link tags that reference CSS files we're injecting
+        cssFiles.forEach((file) => {
+          const escapedPath = file.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          modifiedHtml = modifiedHtml.replace(
+            new RegExp(
+              `<link\\s+[^>]*href=["'][\\.\/]*${escapedPath}["'][^>]*>`,
+              "gi"
+            ),
+            ""
+          );
+        });
+      }
+
+      // Inject all JS files
+      if (jsFiles.length > 0) {
+        const allJsContent = jsFiles
+          .map(
+            (file) =>
+              `<script data-injected-from="${file.path}">\n${file.html}\n</script>`
+          )
+          .join("\n");
+
+        if (modifiedHtml.includes("</body>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "</body>",
+            `${allJsContent}\n</body>`
+          );
+        } else if (modifiedHtml.includes("<body>")) {
+          modifiedHtml = modifiedHtml + allJsContent;
+        } else {
+          // If no body tag, append to document
+          modifiedHtml = modifiedHtml + "\n" + allJsContent;
+        }
+
+        // Remove all script tags that reference JS files we're injecting
+        jsFiles.forEach((file) => {
+          const escapedPath = file.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          modifiedHtml = modifiedHtml.replace(
+            new RegExp(
+              `<script\\s+[^>]*src=["'][\\.\/]*${escapedPath}["'][^>]*><\\/script>`,
+              "gi"
+            ),
+            ""
+          );
+        });
+      }
+
+      return modifiedHtml;
+    },
+    [pages, previewPageData?.path]
+  );
+
+  useEffect(() => {
+    if (isNew && previewPageData?.html) {
       const now = Date.now();
       const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
 
-      // If this is the first update or 3 seconds have passed, update immediately
       if (lastUpdateTimeRef.current === 0 || timeSinceLastUpdate >= 3000) {
-        setThrottledHtml(currentPageData.html);
+        const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+        setThrottledHtml(processedHtml);
         lastUpdateTimeRef.current = now;
       } else {
-        // Otherwise, schedule an update for when 3 seconds will have passed
         const timeUntilNextUpdate = 3000 - timeSinceLastUpdate;
         const timer = setTimeout(() => {
-          setThrottledHtml(currentPageData.html);
+          const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+          setThrottledHtml(processedHtml);
           lastUpdateTimeRef.current = Date.now();
         }, timeUntilNextUpdate);
         return () => clearTimeout(timer);
       }
     }
-  }, [isNew, currentPageData?.html]);
+  }, [isNew, previewPageData?.html, injectAssetsIntoHtml]);
 
   useEffect(() => {
-    if (!isAiWorking && !globalAiLoading && currentPageData?.html) {
-      setStableHtml(currentPageData.html);
+    if (!isAiWorking && !globalAiLoading && previewPageData?.html) {
+      const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+      setStableHtml(processedHtml);
     }
-  }, [isAiWorking, globalAiLoading, currentPageData?.html]);
+  }, [
+    isAiWorking,
+    globalAiLoading,
+    previewPageData?.html,
+    injectAssetsIntoHtml,
+    previewPage,
+  ]);
 
   useEffect(() => {
     if (
-      currentPageData?.html &&
+      previewPageData?.html &&
       !stableHtml &&
       !isAiWorking &&
       !globalAiLoading
     ) {
-      setStableHtml(currentPageData.html);
+      const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+      setStableHtml(processedHtml);
     }
-  }, [currentPageData?.html, stableHtml, isAiWorking, globalAiLoading]);
+  }, [
+    previewPageData?.html,
+    stableHtml,
+    isAiWorking,
+    globalAiLoading,
+    injectAssetsIntoHtml,
+  ]);
 
-  useUpdateEffect(() => {
+  const setupIframeListeners = () => {
+    if (iframeRef?.current?.contentDocument) {
+      const iframeDocument = iframeRef.current.contentDocument;
+
+      // Use event delegation to catch clicks on anchors in both light and shadow DOM
+      iframeDocument.addEventListener(
+        "click",
+        handleCustomNavigation as any,
+        true
+      );
+
+      if (isEditableModeEnabled) {
+        iframeDocument.addEventListener("mouseover", handleMouseOver);
+        iframeDocument.addEventListener("mouseout", handleMouseOut);
+        iframeDocument.addEventListener("click", handleClick);
+      }
+    }
+  };
+
+  useEffect(() => {
     const cleanupListeners = () => {
       if (iframeRef?.current?.contentDocument) {
         const iframeDocument = iframeRef.current.contentDocument;
+        iframeDocument.removeEventListener(
+          "click",
+          handleCustomNavigation as any,
+          true
+        );
         iframeDocument.removeEventListener("mouseover", handleMouseOver);
         iframeDocument.removeEventListener("mouseout", handleMouseOut);
         iframeDocument.removeEventListener("click", handleClick);
       }
     };
 
-    if (iframeRef?.current) {
-      const iframeDocument = iframeRef.current.contentDocument;
-      if (iframeDocument) {
+    const timer = setTimeout(() => {
+      if (iframeRef?.current?.contentDocument) {
         cleanupListeners();
-
-        if (isEditableModeEnabled) {
-          iframeDocument.addEventListener("mouseover", handleMouseOver);
-          iframeDocument.addEventListener("mouseout", handleMouseOut);
-          iframeDocument.addEventListener("click", handleClick);
-        }
+        setupIframeListeners();
       }
-    }
+    }, 50);
 
-    return cleanupListeners;
-  }, [iframeRef, isEditableModeEnabled]);
+    return () => {
+      clearTimeout(timer);
+      cleanupListeners();
+    };
+  }, [isEditableModeEnabled, stableHtml, throttledHtml, previewPage]);
 
   const promoteVersion = async () => {
     setIsPromotingVersion(true);
@@ -124,6 +268,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
           setCurrentCommit(null);
           setPages(res.data.pages);
           setCurrentPage(res.data.pages[0].path);
+          setPreviewPage(res.data.pages[0].path);
           toast.success("Version promoted successfully");
         }
       })
@@ -176,17 +321,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
       const iframeDocument = iframeRef.current.contentDocument;
       if (iframeDocument) {
         const targetElement = event.target as HTMLElement;
-        if (targetElement !== iframeDocument.body) {
-          setSelectedElement(targetElement);
-        }
-      }
-    }
-  };
 
-  const handleCustomNavigation = (event: MouseEvent) => {
-    if (iframeRef?.current) {
-      const iframeDocument = iframeRef.current.contentDocument;
-      if (iframeDocument) {
         const findClosestAnchor = (
           element: HTMLElement
         ): HTMLAnchorElement | null => {
@@ -200,25 +335,102 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
           return null;
         };
 
-        const anchorElement = findClosestAnchor(event.target as HTMLElement);
+        const anchorElement = findClosestAnchor(targetElement);
+
+        if (anchorElement) {
+          return;
+        }
+
+        if (targetElement !== iframeDocument.body) {
+          setSelectedElement(targetElement);
+        }
+      }
+    }
+  };
+
+  const handleCustomNavigation = (event: MouseEvent) => {
+    if (iframeRef?.current) {
+      const iframeDocument = iframeRef.current.contentDocument;
+      if (iframeDocument) {
+        const path = event.composedPath();
+        const actualTarget = path[0] as HTMLElement;
+
+        const findClosestAnchor = (
+          element: HTMLElement
+        ): HTMLAnchorElement | null => {
+          let current: HTMLElement | null = element;
+          while (current && current !== iframeDocument.body) {
+            if (current.tagName === "A") {
+              return current as HTMLAnchorElement;
+            }
+            const parent: Node | null = current.parentNode;
+            if (parent instanceof ShadowRoot) {
+              current = parent.host as HTMLElement;
+            } else if (parent instanceof HTMLElement) {
+              current = parent;
+            } else {
+              break;
+            }
+          }
+          return null;
+        };
+
+        const anchorElement = findClosestAnchor(actualTarget);
         if (anchorElement) {
           let href = anchorElement.getAttribute("href");
           if (href) {
             event.stopPropagation();
             event.preventDefault();
 
-            if (href.includes("#") && !href.includes(".html")) {
-              const targetElement = iframeDocument.querySelector(href);
+            if (href.startsWith("#")) {
+              let targetElement = iframeDocument.querySelector(href);
+
+              if (!targetElement) {
+                const searchInShadows = (
+                  root: Document | ShadowRoot
+                ): Element | null => {
+                  const elements = root.querySelectorAll("*");
+                  for (const el of elements) {
+                    if (el.shadowRoot) {
+                      const found = el.shadowRoot.querySelector(href);
+                      if (found) return found;
+                      const nested = searchInShadows(el.shadowRoot);
+                      if (nested) return nested;
+                    }
+                  }
+                  return null;
+                };
+                targetElement = searchInShadows(iframeDocument);
+              }
+
               if (targetElement) {
                 targetElement.scrollIntoView({ behavior: "smooth" });
               }
               return;
             }
 
-            href = href.split(".html")[0] + ".html";
-            const isPageExist = pages.some((page) => page.path === href);
+            let normalizedHref = href.replace(/^\.?\//, "");
+
+            if (normalizedHref === "" || normalizedHref === "/") {
+              normalizedHref = "index.html";
+            }
+
+            const hashIndex = normalizedHref.indexOf("#");
+            if (hashIndex !== -1) {
+              normalizedHref = normalizedHref.substring(0, hashIndex);
+            }
+
+            if (!normalizedHref.includes(".")) {
+              normalizedHref = normalizedHref + ".html";
+            }
+
+            const isPageExist = pages.some((page) => {
+              const pagePath = page.path.replace(/^\.?\//, "");
+              return pagePath === normalizedHref;
+            });
+
             if (isPageExist) {
-              setCurrentPage(href);
+              setPreviewPage(normalizedHref);
             }
           }
         }
@@ -244,6 +456,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
           "[mask-image:radial-gradient(900px_circle_at_center,white,transparent)] opacity-40"
         )}
       />
+      {/* Preview page indicator */}
       {!isAiWorking && hoveredElement && isEditableModeEnabled && (
         <div
           className="cursor-pointer absolute bg-sky-500/10 border-[2px] border-dashed border-sky-500 rounded-r-lg rounded-b-lg p-3 z-10 pointer-events-none"
@@ -306,20 +519,12 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
                         }
                       );
                     }
-                    // add event listener to all links in the iframe to handle navigation
-                    if (iframeRef?.current?.contentWindow?.document) {
-                      const links =
-                        iframeRef.current.contentWindow.document.querySelectorAll(
-                          "a"
-                        );
-                      links.forEach((link) => {
-                        link.addEventListener("click", handleCustomNavigation);
-                      });
-                    }
+                    // Set up event listeners after iframe loads
+                    setupIframeListeners();
                   }
                 : undefined
             }
-            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals allow-forms"
             allow="accelerometer; ambient-light-sensor; autoplay; battery; camera; clipboard-read; clipboard-write; display-capture; document-domain; encrypted-media; fullscreen; geolocation; gyroscope; layout-animations; legacy-image-formats; magnetometer; microphone; midi; oversized-images; payment; picture-in-picture; publickey-credentials-get; serial; sync-xhr; usb; vr ; wake-lock; xr-spatial-tracking"
           />
           {!isNew && (

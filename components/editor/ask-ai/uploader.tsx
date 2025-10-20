@@ -2,13 +2,12 @@ import { useRef, useState } from "react";
 import {
   CheckCircle,
   ImageIcon,
-  Images,
-  Link,
   Paperclip,
   Upload,
   Video,
   Music,
   FileVideo,
+  Lock,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -24,8 +23,12 @@ import { useUser } from "@/hooks/useUser";
 import { useEditor } from "@/hooks/useEditor";
 import { useAi } from "@/hooks/useAi";
 import { useLoginModal } from "@/components/contexts/login-context";
+import Link from "next/link";
 
 export const getFileType = (url: string) => {
+  if (typeof url !== "string") {
+    return "unknown";
+  }
   const extension = url.split(".").pop()?.toLowerCase();
   if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension || "")) {
     return "image";
@@ -40,7 +43,13 @@ export const getFileType = (url: string) => {
 export const Uploader = ({ project }: { project: Project | undefined }) => {
   const { user } = useUser();
   const { openLoginModal } = useLoginModal();
-  const { uploadFiles, isUploading, files, globalEditorLoading } = useEditor();
+  const {
+    uploadFiles,
+    isUploading,
+    files,
+    globalEditorLoading,
+    project: editorProject,
+  } = useEditor();
   const { selectedFiles, setSelectedFiles, globalAiLoading } = useAi();
 
   const [open, setOpen] = useState(false);
@@ -112,6 +121,27 @@ export const Uploader = ({ project }: { project: Project | undefined }) => {
             </p>
           </header>
           <main className="space-y-4 p-5">
+            {editorProject?.private && (
+              <div className="flex items-center justify-center flex-col gap-2 bg-amber-500/10 rounded-md p-3 border border-amber-500/10">
+                <Lock className="size-4 text-lg text-amber-700" />
+                <p className="text-xs text-amber-700">
+                  You can upload media files to your private project, but
+                  probably won't be able to see them in the preview.
+                </p>
+                <Link
+                  href={`https://huggingface.co/spaces/${editorProject.space_id}/settings`}
+                  target="_blank"
+                >
+                  <Button
+                    variant="black"
+                    size="xs"
+                    className="!bg-amber-600 !text-white"
+                  >
+                    Make it public
+                  </Button>
+                </Link>
+              </div>
+            )}
             <div>
               <p className="text-xs text-left text-neutral-700 mb-2">
                 Uploaded Media Files

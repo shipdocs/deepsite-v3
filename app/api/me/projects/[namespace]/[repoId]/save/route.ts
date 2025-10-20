@@ -3,6 +3,7 @@ import { uploadFiles } from "@huggingface/hub";
 
 import { isAuthenticated } from "@/lib/auth";
 import { Page } from "@/types";
+import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 
 export async function PUT(
   req: NextRequest,
@@ -28,11 +29,23 @@ export async function PUT(
     // Prepare files for upload
     const files: File[] = [];
     pages.forEach((page: Page) => {
-      const file = new File([page.html], page.path, { type: "text/html" });
+      // Determine MIME type based on file extension
+      let mimeType = "text/html";
+      if (page.path.endsWith(".css")) {
+        mimeType = "text/css";
+      } else if (page.path.endsWith(".js")) {
+        mimeType = "text/javascript";
+      } else if (page.path.endsWith(".json")) {
+        mimeType = "application/json";
+      }
+      // Inject the DeepSite badge script into index pages only (not components or other HTML files)
+      const content = (mimeType === "text/html" && isIndexPage(page.path)) 
+        ? injectDeepSiteBadge(page.html) 
+        : page.html;
+      const file = new File([content], page.path, { type: mimeType });
       files.push(file);
     });
 
-    // Upload files to HuggingFace Hub
     const response = await uploadFiles({
       repo: {
         type: "space",

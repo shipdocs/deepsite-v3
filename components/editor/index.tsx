@@ -10,9 +10,8 @@ import Editor from "@monaco-editor/react";
 import { useEditor } from "@/hooks/useEditor";
 import { Header } from "@/components/editor/header";
 import { useAi } from "@/hooks/useAi";
-import { defaultHTML } from "@/lib/consts";
 
-import { ListPages } from "./pages";
+import { FileBrowser } from "./file-browser";
 import { AskAi } from "./ask-ai";
 import { Preview } from "./preview";
 import { SaveChangesPopup } from "./save-changes-popup";
@@ -37,6 +36,7 @@ export const AppEditor = ({
     currentCommit,
     hasUnsavedChanges,
     saveChanges,
+    globalEditorLoading,
     pages,
   } = useEditor(namespace, repoId);
   const { isAiWorking } = useAi();
@@ -63,6 +63,22 @@ export const AppEditor = ({
     }
   }, [hasUnsavedChanges, isAiWorking]);
 
+  // Determine the language based on file extension
+  const editorLanguage = useMemo(() => {
+    const path = currentPageData.path;
+    if (path.endsWith(".css")) return "css";
+    if (path.endsWith(".js")) return "javascript";
+    return "html";
+  }, [currentPageData.path]);
+
+  // Determine the copy message based on file type
+  const copyMessage = useMemo(() => {
+    if (editorLanguage === "css") return "CSS copied to clipboard!";
+    if (editorLanguage === "javascript")
+      return "JavaScript copied to clipboard!";
+    return "HTML copied to clipboard!";
+  }, [editorLanguage]);
+
   return (
     <section className="h-screen w-full bg-neutral-950 flex flex-col">
       <Header />
@@ -77,16 +93,16 @@ export const AppEditor = ({
             }
           )}
         >
-          <ListPages />
+          <FileBrowser />
           <CopyIcon
             className="size-4 absolute top-14 right-5 text-neutral-500 hover:text-neutral-300 z-2 cursor-pointer"
             onClick={() => {
               copyToClipboard(currentPageData.html);
-              toast.success("HTML copied to clipboard!");
+              toast.success(copyMessage);
             }}
           />
           <Editor
-            defaultLanguage="html"
+            language={editorLanguage}
             theme="vs-dark"
             loading={<Loading overlay={false} />}
             className="h-full absolute left-0 top-0 lg:min-w-[600px]"
@@ -99,13 +115,16 @@ export const AppEditor = ({
                 horizontal: "hidden",
               },
               wordWrap: "on",
-              readOnly: !!isAiWorking || !!currentCommit,
+              readOnly: !!isAiWorking || !!currentCommit || globalEditorLoading,
               readOnlyMessage: {
-                value: currentCommit
+                value: globalEditorLoading
+                  ? "Wait for DeepSite loading your project..."
+                  : currentCommit
                   ? "You can't edit the code, as this is an old version of the project."
                   : "Wait for DeepSite to finish working...",
                 isTrusted: true,
               },
+              cursorBlinking: "smooth",
             }}
             value={currentPageData.html}
             onChange={(value) => {
