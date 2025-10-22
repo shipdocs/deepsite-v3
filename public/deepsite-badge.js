@@ -73,13 +73,13 @@
   
   // Create link
   const link = document.createElement('a');
-  link.href = 'https://deepsite.hf.co';
+  link.href = 'https://hf.co/deepsite';
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   
   // Create icon placeholder
   const icon = document.createElement('img');
-  icon.src = 'https://deepsite.hf.co/logo.svg';
+  icon.src = 'https://hf.co/deepsite/logo.svg';
   icon.alt = 'DeepSite';
   icon.style.marginRight = '6px';
   icon.style.width = '16px';

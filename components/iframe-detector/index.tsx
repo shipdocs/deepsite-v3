@@ -16,7 +16,7 @@ export default function IframeDetector() {
         host === "huggingface.co" ||
         host === "hf.co" ||
         host === "enzostvs-deepsite.hf.space" ||
-        host === "deepsite.hf.co"
+        host === "hf.co/deepsite"
       );
     };
 

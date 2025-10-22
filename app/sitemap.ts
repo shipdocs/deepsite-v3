@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://deepsite.hf.co';
+  const baseUrl = 'https://hf.co/deepsite';
   
   return [
     {

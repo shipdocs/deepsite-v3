@@ -273,7 +273,7 @@ tags:
 ---
 
 # Welcome to your new DeepSite project!
-This project was created with [DeepSite](https://deepsite.hf.co).
+This project was created with [DeepSite](https://hf.co/deepsite).
 `;
 
   const files: File[] = [];
@@ -333,7 +333,7 @@ This project was created with [DeepSite](https://deepsite.hf.co).
       accessToken: hf_token,
     });
 
-    const projectUrl = `https://deepsite.hf.co/${path}`;
+    const projectUrl = `https://hf.co/deepsite/${path}`;
     const spaceUrl = `https://huggingface.co/spaces/${path}`;
     const liveUrl = `https://${username}-${formattedTitle}.hf.space`;
 

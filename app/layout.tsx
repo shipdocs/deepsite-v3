@@ -81,12 +81,12 @@ export default async function RootLayout({
   const structuredData = generateStructuredData("WebApplication", {
     name: "DeepSite",
     description: "Build websites with AI, no code required",
-    url: "https://deepsite.hf.co",
+    url: "https://hf.co/deepsite",
   });
 
   const organizationData = generateStructuredData("Organization", {
     name: "DeepSite",
-    url: "https://deepsite.hf.co",
+    url: "https://hf.co/deepsite",
   });
 
   return (
@@ -107,7 +107,7 @@ export default async function RootLayout({
       </head>
       <Script
         defer
-        data-domain="deepsite.hf.co"
+        data-domain="hf.co/deepsite"
         src="https://plausible.io/js/script.js"
       ></Script>
       <body

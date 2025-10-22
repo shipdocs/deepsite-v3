@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   } else if (host.includes("hf.space") || host.includes("/spaces/enzostvs")) {
     url = "enzostvs-deepsite.hf.space";
   } else {
-    url = "deepsite.hf.co";
+    url = "hf.co/deepsite";
   }
   
   const redirect_uri =
