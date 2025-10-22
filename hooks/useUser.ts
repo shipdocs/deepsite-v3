@@ -70,7 +70,6 @@ export const useUser = (initialData?: {
       .post("/auth", { code })
       .then(async (res: any) => {
         if (res.data && res.data.access_token) {
-          // Set cookie using useCookie hook
           const expiresIn = res.data.expires_in || 3600;
           const expiresDate = new Date();
           expiresDate.setTime(expiresDate.getTime() + expiresIn * 1000);
@@ -82,7 +81,6 @@ export const useUser = (initialData?: {
             secure: window.location.protocol === 'https:',
           });
           
-          // Refetch user data from /api/me
           const meResponse = await api.get("/me");
           if (meResponse.data) {
             client.setQueryData(["user.me"], {
