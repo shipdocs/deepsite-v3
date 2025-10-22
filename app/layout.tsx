@@ -56,8 +56,17 @@ export const viewport: Viewport = {
 
 async function getMe() {
   const cookieStore = await cookies();
-  const token = cookieStore.get(MY_TOKEN_KEY())?.value;
-  console.log("TOKEN IS => ", token);
+  const tokenKey = MY_TOKEN_KEY();
+  const token = cookieStore.get(tokenKey)?.value;
+
+  // Debug logging
+  console.log("🔍 [DEBUG] Cookie Key:", tokenKey);
+  console.log("🔍 [DEBUG] Token found:", !!token);
+  console.log(
+    "🔍 [DEBUG] All cookies:",
+    cookieStore.getAll().map((c) => c.name)
+  );
+
   if (!token) return { user: null, projects: [], errCode: null };
   try {
     const res = await apiServer.get("/me", {
@@ -67,6 +76,7 @@ async function getMe() {
     });
     return { user: res.data.user, projects: res.data.projects, errCode: null };
   } catch (err: any) {
+    console.error("🔍 [DEBUG] API Error:", err.status, err.message);
     return { user: null, projects: [], errCode: err.status };
   }
 }

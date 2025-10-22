@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -70,6 +71,16 @@ export async function POST(req: NextRequest) {
   }
   const user = await userResponse.json();
 
+  // Calculate cookie expiration
+  const expiresIn = response.expires_in || 3600;
+  const maxAge = expiresIn;
+
+  // Determine if we should use secure cookies
+  const isSecure = !host.includes("localhost");
+
+  // Set the cookie via Set-Cookie header
+  const cookieValue = `${MY_TOKEN_KEY()}=${response.access_token}; Path=/; Max-Age=${maxAge}; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+
   return NextResponse.json(
     {
       access_token: response.access_token,
@@ -80,6 +91,7 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
+        "Set-Cookie": cookieValue,
       },
     }
   );
