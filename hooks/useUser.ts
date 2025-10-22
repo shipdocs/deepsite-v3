@@ -110,21 +110,12 @@ export const useUser = (initialData?: {
   };
 
   const logout = async () => {
-    try {
-      await api.post("/auth/logout");
-      removeToken();
-      removeCurrentRoute();
-      client.clear();
-      toast.success("Logout successful");
-      window.location.reload();
-    } catch (error) {
-      console.error("Logout error:", error);
-      removeToken();
-      removeCurrentRoute();
-      client.clear()
-      toast.success("Logout successful");
-      window.location.reload();
-    }
+    console.log("LOG")
+    removeToken();
+    removeCurrentRoute();
+    toast.success("Logout successful");
+    client.clear();
+    window.location.reload();
   };
 
   return {
