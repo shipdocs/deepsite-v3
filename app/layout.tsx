@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Metadata, Viewport } from "next";
 import { Inter, PT_Sans } from "next/font/google";
-import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import Script from "next/script";
 
 import "@/assets/globals.css";
@@ -15,6 +14,7 @@ import TanstackContext from "@/components/contexts/tanstack-query-context";
 import { LoginProvider } from "@/components/contexts/login-context";
 import { ProProvider } from "@/components/contexts/pro-context";
 import { generateSEO, generateStructuredData } from "@/lib/seo";
+import DomainRedirect from "@/components/domain-redirect";
 
 const inter = Inter({
   variable: "--font-inter-sans",
@@ -78,19 +78,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Check host and redirect if not on the correct domains
-  const headersList = await headers();
-  const host = headersList.get("host") || "";
-
-  // Check if we're not on hf.co/deepsite or huggingface.co/deepsite
-  const isHfCo = host === "hf.co" || host.startsWith("hf.co:");
-  const isHuggingFaceCo =
-    host === "huggingface.co" || host.startsWith("huggingface.co:");
-
-  if (!isHfCo && !isHuggingFaceCo) {
-    redirect("https://huggingface.co/deepsite");
-  }
-
   // const data = await getMe();
 
   // Generate structured data
@@ -127,6 +114,7 @@ export default async function RootLayout({
           data-domain="huggingface.co/deepsite"
           src="https://plausible.io/js/script.js"
         />
+        <DomainRedirect />
         <IframeDetector />
         <Toaster richColors position="bottom-center" />
         <TanstackContext>
