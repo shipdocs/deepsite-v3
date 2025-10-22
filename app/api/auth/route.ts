@@ -80,8 +80,6 @@ export async function POST(req: NextRequest) {
       access_token: response.access_token,
       expires_in: response.expires_in,
       user,
-      // Include fallback flag for iframe contexts
-      useLocalStorageFallback: true,
     },
     {
       status: 200,
@@ -91,7 +89,7 @@ export async function POST(req: NextRequest) {
     }
   );
   
-  // Set HTTP-only cookie with proper attributes for iframe support
+  // Set HTTP-only cookie
   const cookieOptions = [
     `${cookieName}=${response.access_token}`,
     `Max-Age=${response.expires_in || 3600}`, // Default 1 hour if not provided

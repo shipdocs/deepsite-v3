@@ -7,13 +7,6 @@ import { useRouter } from "next/navigation";
 import { ProjectType, User } from "@/types";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { 
-  storeAuthDataFallback, 
-  getAuthDataFallback, 
-  clearAuthDataFallback,
-  isInIframe,
-  isMobileDevice 
-} from "@/lib/iframe-storage";
 
 
 export const useUser = (initialData?: {
@@ -29,13 +22,6 @@ export const useUser = (initialData?: {
     useQuery({
       queryKey: ["user.me"],
       queryFn: async () => {
-        // Check for fallback data if no initial data provided and we're in iframe
-        if (!initialData && isInIframe()) {
-          const fallbackData = getAuthDataFallback();
-          if (fallbackData.user && fallbackData.token) {
-            return { user: fallbackData.user, errCode: null };
-          }
-        }
         return { user: initialData?.user || null, errCode: initialData?.errCode || null };
       },
       refetchOnWindowFocus: false,
@@ -73,21 +59,6 @@ export const useUser = (initialData?: {
 
   const openLoginWindow = async () => {
     setCurrentRoute(window.location.pathname);
-    
-    if (isInIframe()) {
-      try {
-        const response = await api.get("/auth/login-url");
-        const { loginUrl } = response.data;
-        
-        window.open(loginUrl, "_blank", "noopener,noreferrer");
-        
-        toast.info("Login opened in new tab. Please complete authentication and return to this page.");
-        return;
-      } catch (error) {
-        console.error("Failed to open login in new tab:", error);
-      }
-    }
-    
     return router.push("/auth");
   };
 
@@ -98,10 +69,6 @@ export const useUser = (initialData?: {
       .post("/auth", { code })
       .then(async (res: any) => {
         if (res.data) {
-          if (res.data.useLocalStorageFallback) {
-            storeAuthDataFallback(res.data.access_token, res.data.user);
-          }
-          
           client.setQueryData(["user.me"], {
             user: res.data.user,
             errCode: null,
@@ -126,14 +93,12 @@ export const useUser = (initialData?: {
   const logout = async () => {
     try {
       await api.post("/auth/logout");
-      clearAuthDataFallback();
       removeCurrentRoute();
       client.clear();
       toast.success("Logout successful");
       window.location.reload();
     } catch (error) {
       console.error("Logout error:", error);
-      clearAuthDataFallback();
       removeCurrentRoute();
       client.clear()
       toast.success("Logout successful");
