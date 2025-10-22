@@ -106,12 +106,12 @@ export const useUser = (initialData?: {
             user: res.data.user,
             errCode: null,
           });
-          if (currentRoute) {
-            router.push(currentRoute);
-            removeCurrentRoute();
-          } else {
+          // if (currentRoute) {
+          //   router.push(currentRoute);
+          //   removeCurrentRoute();
+          // } else {
             router.push("/");
-          }
+          // }
           toast.success("Login successful");
         }
       })
