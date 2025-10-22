@@ -6,6 +6,7 @@ export const api = axios.create({
   headers: {
     cache: "no-store",
   },
+  withCredentials: true, // Ensure cookies are sent with requests
 });
 
 export const apiServer = axios.create({
@@ -13,6 +14,7 @@ export const apiServer = axios.create({
   headers: {
     cache: "no-store",
   },
+  withCredentials: true, // Ensure cookies are sent with requests
 });
 api.interceptors.request.use(
   async (config) => {

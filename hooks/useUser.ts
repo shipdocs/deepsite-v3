@@ -75,12 +75,20 @@ export const useUser = (initialData?: {
           const expiresDate = new Date();
           expiresDate.setTime(expiresDate.getTime() + expiresIn * 1000);
           
-          setToken(res.data.access_token, {
+          const cookieOptions: any = {
             expires: expiresDate,
             path: '/',
             sameSite: 'lax',
-            secure: window.location.protocol === 'https:',
-          });
+          };
+          
+          if (window.location.protocol === 'https:') {
+            cookieOptions.secure = true;
+          }
+          
+          setToken(res.data.access_token, cookieOptions);
+          
+          const cookieString = `${MY_TOKEN_KEY()}=${res.data.access_token}; path=/; max-age=${expiresIn}; samesite=lax${cookieOptions.secure ? '; secure' : ''}`;
+          document.cookie = cookieString;
           
           const meResponse = await api.get("/me");
           if (meResponse.data) {
@@ -93,12 +101,10 @@ export const useUser = (initialData?: {
             }
           }
           
-          // if (currentRoute) {
-          //   router.push(currentRoute);
-          //   removeCurrentRoute();
-          // } else {
-            router.push("/");
-          // }
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 100);
+          
           toast.success("Login successful");
         }
       })

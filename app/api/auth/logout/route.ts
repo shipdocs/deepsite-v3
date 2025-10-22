@@ -1,23 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const cookieName = MY_TOKEN_KEY();
-  const host = req.headers.get("host") ?? "localhost:3000";
-  const isSecure = !host.includes("localhost");
+  const isProduction = process.env.NODE_ENV === "production";
   
   const response = NextResponse.json(
     { message: "Logged out successfully" },
     { status: 200 }
   );
   
-  // Clear the cookie (matching the same settings as login)
+  // Clear the HTTP-only cookie
   const cookieOptions = [
     `${cookieName}=`,
     "Max-Age=0",
     "Path=/",
-    "SameSite=Lax",
-    ...(isSecure ? ["Secure"] : [])
+    "HttpOnly",
+    ...(isProduction ? ["Secure", "SameSite=None"] : ["SameSite=Lax"])
   ].join("; ");
   
   response.headers.set("Set-Cookie", cookieOptions);

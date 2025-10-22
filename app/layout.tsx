@@ -56,16 +56,8 @@ export const viewport: Viewport = {
 
 async function getMe() {
   const cookieStore = await cookies();
-  const tokenKey = MY_TOKEN_KEY();
-  const token = cookieStore.get(tokenKey)?.value;
-
-  // Debug logging
-  console.log("🔍 [DEBUG] Cookie Key:", tokenKey);
-  console.log("🔍 [DEBUG] Token found:", !!token);
-  console.log(
-    "🔍 [DEBUG] All cookies:",
-    cookieStore.getAll().map((c) => c.name)
-  );
+  const cookieName = MY_TOKEN_KEY();
+  const token = cookieStore.get(cookieName)?.value;
 
   if (!token) return { user: null, projects: [], errCode: null };
   try {
@@ -74,9 +66,10 @@ async function getMe() {
         Authorization: `Bearer ${token}`,
       },
     });
+    console.log("✅ [Server] User authenticated:", res.data.user?.name);
     return { user: res.data.user, projects: res.data.projects, errCode: null };
   } catch (err: any) {
-    console.error("🔍 [DEBUG] API Error:", err.status, err.message);
+    console.error("❌ [Server] Auth error:", err.status, err.message);
     return { user: null, projects: [], errCode: err.status };
   }
 }
