@@ -54,32 +54,30 @@ export const viewport: Viewport = {
   themeColor: "#000000",
 };
 
-async function getMe() {
-  const cookieStore = await cookies();
-  const cookieName = MY_TOKEN_KEY();
-  const token = cookieStore.get(cookieName)?.value;
+// async function getMe() {
+//   const cookieStore = await cookies();
+//   const cookieName = MY_TOKEN_KEY();
+//   const token = cookieStore.get(cookieName)?.value;
 
-  if (!token) return { user: null, projects: [], errCode: null };
-  try {
-    const res = await apiServer.get("/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log("✅ [Server] User authenticated:", res.data.user?.name);
-    return { user: res.data.user, projects: res.data.projects, errCode: null };
-  } catch (err: any) {
-    console.error("❌ [Server] Auth error:", err.status, err.message);
-    return { user: null, projects: [], errCode: err.status };
-  }
-}
+//   if (!token) return { user: null, projects: [], errCode: null };
+//   try {
+//     const res = await apiServer.get("/me", {
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//     });
+//     return { user: res.data.user, projects: res.data.projects, errCode: null };
+//   } catch (err: any) {
+//     return { user: null, projects: [], errCode: err.status };
+//   }
+// }
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const data = await getMe();
+  // const data = await getMe();
 
   // Generate structured data
   const structuredData = generateStructuredData("WebApplication", {
@@ -118,7 +116,7 @@ export default async function RootLayout({
         <IframeDetector />
         <Toaster richColors position="bottom-center" />
         <TanstackContext>
-          <AppContext me={data}>
+          <AppContext>
             <LoginProvider>
               <ProProvider>{children}</ProProvider>
             </LoginProvider>

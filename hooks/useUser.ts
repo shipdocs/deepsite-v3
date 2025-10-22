@@ -18,22 +18,26 @@ export const useUser = (initialData?: {
   const client = useQueryClient();
   const router = useRouter();
   const [, setCurrentRoute, removeCurrentRoute] = useCookie("deepsite-currentRoute");
-  const [, setToken, removeToken] = useCookie(MY_TOKEN_KEY());
+  const [token, setToken, removeToken] = useCookie(MY_TOKEN_KEY());
 
-  const { data: { user, errCode } = { user: null, errCode: null }, isLoading } =
+  const { data: { user, errCode } = { user: null, errCode: null }, isLoading, refetch: refetchMe } =
     useQuery({
       queryKey: ["user.me"],
       queryFn: async () => {
-        return { user: initialData?.user || null, errCode: initialData?.errCode || null };
+        const me = await api.get("/me");
+        if (me.data) {
+          if (me.data.projects) {
+            setProjects(me.data.projects);
+          }
+          return { user: me.data.user, errCode: me.data.errCode };
+        }
+        return { user: null, errCode: null };
       },
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
       retry: false,
-      initialData: initialData
-        ? { user: initialData?.user, errCode: initialData?.errCode }
-        : undefined,
-      enabled: false,
+      enabled: true,
     });
 
   const { data: loadingAuth } = useQuery({
@@ -90,21 +94,8 @@ export const useUser = (initialData?: {
           const cookieString = `${MY_TOKEN_KEY()}=${res.data.access_token}; path=/; max-age=${expiresIn}; samesite=lax${cookieOptions.secure ? '; secure' : ''}`;
           document.cookie = cookieString;
           
-          const meResponse = await api.get("/me");
-          if (meResponse.data) {
-            client.setQueryData(["user.me"], {
-              user: meResponse.data.user,
-              errCode: null,
-            });
-            if (meResponse.data.projects) {
-              setProjects(meResponse.data.projects);
-            }
-          }
-          
-          setTimeout(() => {
-            window.location.href = "/";
-          }, 100);
-          
+          refetchMe();
+          router.push("/")
           toast.success("Login successful");
         }
       })
