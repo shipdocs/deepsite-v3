@@ -91,7 +91,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <head>
+      <body
+        className={`${inter.variable} ${ptSans.variable} antialiased bg-black dark h-[100dvh] overflow-hidden`}
+      >
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -104,15 +106,11 @@ export default async function RootLayout({
             __html: JSON.stringify(organizationData),
           }}
         />
-      </head>
-      <Script
-        defer
-        data-domain="huggingface.co/deepsite"
-        src="https://plausible.io/js/script.js"
-      ></Script>
-      <body
-        className={`${inter.variable} ${ptSans.variable} antialiased bg-black dark h-[100dvh] overflow-hidden`}
-      >
+        <Script
+          defer
+          data-domain="huggingface.co/deepsite"
+          src="https://plausible.io/js/script.js"
+        />
         <IframeDetector />
         <Toaster richColors position="bottom-center" />
         <TanstackContext>
