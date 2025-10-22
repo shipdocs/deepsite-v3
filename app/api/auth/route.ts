@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -71,10 +70,7 @@ export async function POST(req: NextRequest) {
   }
   const user = await userResponse.json();
 
-  const cookieName = MY_TOKEN_KEY();
-  const isProduction = process.env.NODE_ENV === "production";
-  
-  const nextResponse = NextResponse.json(
+  return NextResponse.json(
     {
       access_token: response.access_token,
       expires_in: response.expires_in,
@@ -87,17 +83,4 @@ export async function POST(req: NextRequest) {
       },
     }
   );
-  
-  // Set HTTP-only cookie
-  const cookieOptions = [
-    `${cookieName}=${response.access_token}`,
-    `Max-Age=${response.expires_in || 3600}`, // Default 1 hour if not provided
-    "Path=/deepsite",
-    "HttpOnly",
-    ...(isProduction ? ["Secure", "SameSite=None"] : ["SameSite=Lax"])
-  ].join("; ");
-  
-  nextResponse.headers.set("Set-Cookie", cookieOptions);
-  
-  return nextResponse;
 }

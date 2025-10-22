@@ -17,6 +17,7 @@ export const useUser = (initialData?: {
   const client = useQueryClient();
   const router = useRouter();
   const [currentRoute, setCurrentRoute, removeCurrentRoute] = useCookie("deepsite-currentRoute");
+  const [token, setToken, removeToken] = useCookie("deepsite-auth-token");
 
   const { data: { user, errCode } = { user: null, errCode: null }, isLoading } =
     useQuery({
@@ -68,11 +69,31 @@ export const useUser = (initialData?: {
     await api
       .post("/auth", { code })
       .then(async (res: any) => {
-        if (res.data) {
-          client.setQueryData(["user.me"], {
-            user: res.data.user,
-            errCode: null,
+        if (res.data && res.data.access_token) {
+          // Set cookie using useCookie hook
+          const expiresIn = res.data.expires_in || 3600;
+          const expiresDate = new Date();
+          expiresDate.setTime(expiresDate.getTime() + expiresIn * 1000);
+          
+          setToken(res.data.access_token, {
+            expires: expiresDate,
+            path: '/deepsite',
+            sameSite: 'lax',
+            secure: window.location.protocol === 'https:',
           });
+          
+          // Refetch user data from /api/me
+          const meResponse = await api.get("/me");
+          if (meResponse.data) {
+            client.setQueryData(["user.me"], {
+              user: meResponse.data.user,
+              errCode: null,
+            });
+            if (meResponse.data.projects) {
+              setProjects(meResponse.data.projects);
+            }
+          }
+          
           // if (currentRoute) {
           //   router.push(currentRoute);
           //   removeCurrentRoute();
@@ -93,12 +114,14 @@ export const useUser = (initialData?: {
   const logout = async () => {
     try {
       await api.post("/auth/logout");
+      removeToken();
       removeCurrentRoute();
       client.clear();
       toast.success("Logout successful");
       window.location.reload();
     } catch (error) {
       console.error("Logout error:", error);
+      removeToken();
       removeCurrentRoute();
       client.clear()
       toast.success("Logout successful");
