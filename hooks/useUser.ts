@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ProjectType, User } from "@/types";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 
 
 export const useUser = (initialData?: {
@@ -16,8 +17,8 @@ export const useUser = (initialData?: {
 }) => {
   const client = useQueryClient();
   const router = useRouter();
-  const [currentRoute, setCurrentRoute, removeCurrentRoute] = useCookie("deepsite-currentRoute");
-  const [token, setToken, removeToken] = useCookie("deepsite-auth-token");
+  const [, setCurrentRoute, removeCurrentRoute] = useCookie("deepsite-currentRoute");
+  const [, setToken, removeToken] = useCookie(MY_TOKEN_KEY());
 
   const { data: { user, errCode } = { user: null, errCode: null }, isLoading } =
     useQuery({
@@ -110,7 +111,6 @@ export const useUser = (initialData?: {
   };
 
   const logout = async () => {
-    console.log("LOG")
     removeToken();
     removeCurrentRoute();
     toast.success("Logout successful");
