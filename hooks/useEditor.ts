@@ -8,10 +8,12 @@ import { defaultHTML } from "@/lib/consts";
 import { Commit, Page, Project } from "@/types";
 import { api } from "@/lib/api";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
+import { useUser } from "./useUser";
 
 export const useEditor = (namespace?: string, repoId?: string) => {
   const client = useQueryClient();
   const router = useRouter();
+  const { token } = useUser();
 
   const { data: project, isFetching: isLoadingProject } = useQuery({
     queryKey: ["editor.project"],
@@ -218,6 +220,9 @@ export const useEditor = (namespace?: string, repoId?: string) => {
         {
           method: "POST",
           body: data,
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
         }
       );
       
