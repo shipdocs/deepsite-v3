@@ -19,7 +19,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
   const [storageProvider, setStorageProvider] = useLocalStorage("provider", "auto");
   const [storageModel, setStorageModel] = useLocalStorage("model", MODELS[0].value);
   const router = useRouter();
-  const { projects, setProjects } = useUser();
+  const { projects, setProjects, token } = useUser();
   const streamingPagesRef = useRef<Set<string>>(new Set());
 
   const { data: isAiWorking = false } = useQuery({
@@ -175,6 +175,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
         headers: {
           "Content-Type": "application/json",
           "x-forwarded-for": window.location.hostname,
+          "Authorization": `Bearer ${token}`,
         },
         signal: abortController.signal,
       });
@@ -304,6 +305,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
         headers: {
           "Content-Type": "application/json",
           "x-forwarded-for": window.location.hostname,
+          "Authorization": `Bearer ${token}`,
         },
         signal: abortController.signal,
       });

@@ -123,6 +123,7 @@ export const useUser = (initialData?: {
     loading: isLoading || loadingAuth,
     openLoginWindow,
     loginFromCode,
+    token,
     logout,
   };
 };

@@ -14,7 +14,7 @@ export const defaultHTML = `<!DOCTYPE html>
         Ask me anything.
       </h1>
     </div>
-      <img src="https://enzostvs-deepsite.hf.space/arrow.svg" class="absolute bottom-8 left-0 w-[100px] transform rotate-[30deg]" />
+      <img src="https://huggingface.co/deepsite/arrow.svg" class="absolute bottom-8 left-0 w-[100px] transform rotate-[30deg]" />
     <script></script>
   </body>
 </html>
