@@ -4,6 +4,36 @@ import { COLORS } from "@/lib/utils";
 import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 import { Commit, Page } from "@/types";
 
+// Timeout configuration (in milliseconds)
+const OPERATION_TIMEOUT = 120000; // 2 minutes for HF operations
+
+// Extend the maximum execution time for this route
+export const maxDuration = 180; // 3 minutes
+
+// Utility function to wrap promises with timeout
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage: string = "Operation timed out"
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutId!);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId!);
+    throw error;
+  }
+}
+
 interface MCPRequest {
   jsonrpc: "2.0";
   id: number | string;
@@ -228,11 +258,15 @@ async function handleCreateProject(params: CreateProjectParams) {
   // Get user info from HF token
   let username: string;
   try {
-    const userResponse = await fetch("https://huggingface.co/api/whoami-v2", {
-      headers: {
-        Authorization: `Bearer ${hf_token}`,
-      },
-    });
+    const userResponse = await withTimeout(
+      fetch("https://huggingface.co/api/whoami-v2", {
+        headers: {
+          Authorization: `Bearer ${hf_token}`,
+        },
+      }),
+      30000, // 30 seconds for authentication
+      "Authentication timeout: Unable to verify Hugging Face token"
+    );
 
     if (!userResponse.ok) {
       throw new Error("Invalid Hugging Face token");
@@ -241,6 +275,9 @@ async function handleCreateProject(params: CreateProjectParams) {
     const userData = await userResponse.json();
     username = userData.name;
   } catch (error: any) {
+    if (error.message?.includes('timeout')) {
+      throw new Error(`Authentication timeout: ${error.message}`);
+    }
     throw new Error(`Authentication failed: ${error.message}`);
   }
 
@@ -300,38 +337,67 @@ This project was created with [DeepSite](https://huggingface.co/deepsite).
   });
 
   try {
-    const { repoUrl } = await createRepo({
-      repo,
-      accessToken: hf_token,
-    });
+    const { repoUrl } = await withTimeout(
+      createRepo({
+        repo,
+        accessToken: hf_token,
+      }),
+      60000, // 1 minute for repo creation
+      "Timeout creating repository. Please try again."
+    );
 
     const commitTitle = !prompt || prompt.trim() === "" ? "Initial project creation via MCP" : prompt;
     
-    await uploadFiles({
-      repo,
-      files,
-      accessToken: hf_token,
-      commitTitle,
-    });
+    await withTimeout(
+      uploadFiles({
+        repo,
+        files,
+        accessToken: hf_token,
+        commitTitle,
+      }),
+      OPERATION_TIMEOUT,
+      "Timeout uploading files. The repository was created but files may not have been uploaded."
+    );
 
     const path = repoUrl.split("/").slice(-2).join("/");
 
     const commits: Commit[] = [];
-    for await (const commit of listCommits({ repo, accessToken: hf_token })) {
-      if (commit.title.includes("initial commit") || commit.title.includes("image(s)") || commit.title.includes("Promote version")) {
-        continue;
-      }
-      commits.push({
-        title: commit.title,
-        oid: commit.oid,
-        date: commit.date,
-      });
+    const commitIterator = listCommits({ repo, accessToken: hf_token });
+    
+    // Wrap the commit listing with a timeout
+    const commitTimeout = new Promise<void>((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout listing commits")), 30000);
+    });
+    
+    try {
+      await Promise.race([
+        (async () => {
+          for await (const commit of commitIterator) {
+            if (commit.title.includes("initial commit") || commit.title.includes("image(s)") || commit.title.includes("Promote version")) {
+              continue;
+            }
+            commits.push({
+              title: commit.title,
+              oid: commit.oid,
+              date: commit.date,
+            });
+          }
+        })(),
+        commitTimeout
+      ]);
+    } catch (error: any) {
+      // If listing commits times out, continue with empty commits array
+      console.error("Failed to list commits:", error.message);
     }
 
-    const space = await spaceInfo({
-      name: repo.name,
-      accessToken: hf_token,
-    });
+    const space = await withTimeout(
+      spaceInfo({
+        name: repo.name,
+        accessToken: hf_token,
+      }),
+      30000, // 30 seconds for space info
+      "Timeout fetching space information"
+    );
 
     const projectUrl = `https://huggingface.co/deepsite/${path}`;
     const spaceUrl = `https://huggingface.co/spaces/${path}`;
@@ -360,6 +426,9 @@ This project was created with [DeepSite](https://huggingface.co/deepsite).
       ],
     };
   } catch (err: any) {
+    if (err.message?.includes('timeout') || err.message?.includes('Timeout')) {
+      throw new Error(err.message || "Operation timed out. Please try again.");
+    }
     throw new Error(err.message || "Failed to create project");
   }
 }

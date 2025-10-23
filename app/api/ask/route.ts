@@ -31,6 +31,10 @@ import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 
 const ipAddresses = new Map();
 
+const STREAMING_TIMEOUT = 180000;
+const REQUEST_TIMEOUT = 240000;
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   const authHeaders = await headers();
   const userToken = request.cookies.get(MY_TOKEN_KEY())?.value;
@@ -113,6 +117,9 @@ export async function POST(request: NextRequest) {
 
     (async () => {
       // let completeResponse = "";
+      let timeoutId: NodeJS.Timeout | null = null;
+      let isTimedOut = false;
+      
       try {
         const client = new InferenceClient(token);
         
@@ -144,22 +151,51 @@ export async function POST(request: NextRequest) {
           billTo ? { billTo } : {}
         );
 
-        while (true) {
-          const { done, value } = await chatCompletion.next()
-          if (done) {
-            break;
-          }
+        // Set up timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            isTimedOut = true;
+            reject(new Error('Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.'));
+          }, STREAMING_TIMEOUT);
+        });
 
-          const chunk = value.choices[0]?.delta?.content;
-          if (chunk) {
-            await writer.write(encoder.encode(chunk));
-          }
-        }
+        // Race between streaming and timeout
+        await Promise.race([
+          (async () => {
+            while (true) {
+              const { done, value } = await chatCompletion.next()
+              if (done) {
+                break;
+              }
+
+              const chunk = value.choices[0]?.delta?.content;
+              if (chunk) {
+                await writer.write(encoder.encode(chunk));
+              }
+            }
+          })(),
+          timeoutPromise
+        ]);
+
+        // Clear timeout if successful
+        if (timeoutId) clearTimeout(timeoutId);
         
         // Explicitly close the writer after successful completion
         await writer.close();
       } catch (error: any) {
-        if (error.message?.includes("exceeded your monthly included credits")) {
+        // Clear timeout on error
+        if (timeoutId) clearTimeout(timeoutId);
+        
+        if (isTimedOut || error.message?.includes('timeout') || error.message?.includes('Request timeout')) {
+          await writer.write(
+            encoder.encode(
+              JSON.stringify({
+                ok: false,
+                message: "Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.",
+              })
+            )
+          );
+        } else if (error.message?.includes("exceeded your monthly included credits")) {
           await writer.write(
             encoder.encode(
               JSON.stringify({
@@ -341,17 +377,52 @@ export async function PUT(request: NextRequest) {
       billTo ? { billTo } : {}
     );
 
+    // Set up timeout for AI streaming
     let chunk = "";
-    while (true) {
-      const { done, value } = await chatCompletion.next();
-      if (done) {
-        break;
-      }
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isTimedOut = false;
 
-      const deltaContent = value.choices[0]?.delta?.content;
-      if (deltaContent) {
-        chunk += deltaContent;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        isTimedOut = true;
+        reject(new Error('Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.'));
+      }, REQUEST_TIMEOUT);
+    });
+
+    try {
+      await Promise.race([
+        (async () => {
+          while (true) {
+            const { done, value } = await chatCompletion.next();
+            if (done) {
+              break;
+            }
+
+            const deltaContent = value.choices[0]?.delta?.content;
+            if (deltaContent) {
+              chunk += deltaContent;
+            }
+          }
+        })(),
+        timeoutPromise
+      ]);
+
+      // Clear timeout if successful
+      if (timeoutId) clearTimeout(timeoutId);
+    } catch (timeoutError: any) {
+      // Clear timeout on error
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (isTimedOut || timeoutError.message?.includes('timeout') || timeoutError.message?.includes('Request timeout')) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.",
+          },
+          { status: 504 }
+        );
       }
+      throw timeoutError;
     }
     if (!chunk) {
       return NextResponse.json(
@@ -616,6 +687,15 @@ This project was created with [DeepSite](https://huggingface.co/deepsite).
       );
     }
   } catch (error: any) {
+    if (error.message?.includes('timeout') || error.message?.includes('Request timeout')) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "Request timeout: The operation took too long to complete. Please try again with a simpler request or try a different model.",
+        },
+        { status: 504 }
+      );
+    }
     if (error.message?.includes("exceeded your monthly included credits")) {
       return NextResponse.json(
         {
