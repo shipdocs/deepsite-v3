@@ -6,34 +6,18 @@ import { InferenceClient } from "@huggingface/inference";
 
 import { MODELS } from "@/lib/providers";
 import {
-  DIVIDER,
   FOLLOW_UP_SYSTEM_PROMPT,
   INITIAL_SYSTEM_PROMPT,
   MAX_REQUESTS_PER_IP,
-  NEW_FILE_END,
-  NEW_FILE_START,
-  REPLACE_END,
-  SEARCH_START,
-  UPDATE_FILE_START,
-  UPDATE_FILE_END,
   PROMPT_FOR_PROJECT_NAME,
 } from "@/lib/prompts";
 import { calculateMaxTokens, estimateInputTokens, getProviderSpecificConfig } from "@/lib/max-tokens";
 import MY_TOKEN_KEY from "@/lib/get-cookie-name";
 import { Page } from "@/types";
-import { createRepo, RepoDesignation, uploadFiles } from "@huggingface/hub";
 import { isAuthenticated } from "@/lib/auth";
 import { getBestProvider } from "@/lib/best-provider";
-// import { rewritePrompt } from "@/lib/rewrite-prompt";
-import { COLORS } from "@/lib/utils";
-import { templates } from "@/lib/templates";
-import { injectDeepSiteBadge, isIndexPage } from "@/lib/inject-badge";
 
 const ipAddresses = new Map();
-
-const STREAMING_TIMEOUT = 180000;
-const REQUEST_TIMEOUT = 240000;
-export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const authHeaders = await headers();
@@ -117,9 +101,6 @@ export async function POST(request: NextRequest) {
 
     (async () => {
       // let completeResponse = "";
-      let timeoutId: NodeJS.Timeout | null = null;
-      let isTimedOut = false;
-      
       try {
         const client = new InferenceClient(token);
         
@@ -151,51 +132,21 @@ export async function POST(request: NextRequest) {
           billTo ? { billTo } : {}
         );
 
-        // Set up timeout
-        const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => {
-            isTimedOut = true;
-            reject(new Error('Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.'));
-          }, STREAMING_TIMEOUT);
-        });
+        while (true) {
+          const { done, value } = await chatCompletion.next()
+          if (done) {
+            break;
+          }
 
-        // Race between streaming and timeout
-        await Promise.race([
-          (async () => {
-            while (true) {
-              const { done, value } = await chatCompletion.next()
-              if (done) {
-                break;
-              }
-
-              const chunk = value.choices[0]?.delta?.content;
-              if (chunk) {
-                await writer.write(encoder.encode(chunk));
-              }
-            }
-          })(),
-          timeoutPromise
-        ]);
-
-        // Clear timeout if successful
-        if (timeoutId) clearTimeout(timeoutId);
+          const chunk = value.choices[0]?.delta?.content;
+          if (chunk) {
+            await writer.write(encoder.encode(chunk));
+          }
+        }
         
-        // Explicitly close the writer after successful completion
         await writer.close();
       } catch (error: any) {
-        // Clear timeout on error
-        if (timeoutId) clearTimeout(timeoutId);
-        
-        if (isTimedOut || error.message?.includes('timeout') || error.message?.includes('Request timeout')) {
-          await writer.write(
-            encoder.encode(
-              JSON.stringify({
-                ok: false,
-                message: "Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.",
-              })
-            )
-          );
-        } else if (error.message?.includes("exceeded your monthly included credits")) {
+        if (error.message?.includes("exceeded your monthly included credits")) {
           await writer.write(
             encoder.encode(
               JSON.stringify({
@@ -259,10 +210,8 @@ export async function PUT(request: NextRequest) {
   const authHeaders = await headers();
 
   const body = await request.json();
-  const { prompt, provider, selectedElementHtml, model, pages, files, repoId: repoIdFromBody, isNew } =
+  const { prompt, provider, selectedElementHtml, model, pages, files, repoId, isNew } =
     body;
-
-  let repoId = repoIdFromBody;
 
   if (!prompt || pages.length === 0) {
     return NextResponse.json(
@@ -314,453 +263,133 @@ export async function PUT(request: NextRequest) {
     billTo = "huggingface";
   }
 
-  const client = new InferenceClient(token);
-
-  const escapeRegExp = (string: string) => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  };
-
-  const createFlexibleHtmlRegex = (searchBlock: string) => {
-    let searchRegex = escapeRegExp(searchBlock)
-      .replace(/\s+/g, '\\s*')
-      .replace(/>\s*</g, '>\\s*<')
-      .replace(/\s*>/g, '\\s*>');
-    
-    return new RegExp(searchRegex, 'g');
-  };
-
-  const selectedProvider = await getBestProvider(selectedModel.value, provider)
+  const selectedProvider = await getBestProvider(selectedModel.value, provider);
 
   try {
-    const systemPrompt = FOLLOW_UP_SYSTEM_PROMPT + (isNew ? PROMPT_FOR_PROJECT_NAME : "");
-    const userContext = "You are modifying the HTML file based on the user's request.";
-    
-    const allPages = pages || [];
-    const pagesContext = allPages
-      .map((p: Page) => `- ${p.path}\n${p.html}`)
-      .join("\n\n");
-    
-    const assistantContext = `${
-      selectedElementHtml
-        ? `\n\nYou have to update ONLY the following element, NOTHING ELSE: \n\n\`\`\`html\n${selectedElementHtml}\n\`\`\` Could be in multiple pages, if so, update all the pages.`
-        : ""
-    }. Current pages (${allPages.length} total): ${pagesContext}. ${files?.length > 0 ? `Available images: ${files?.map((f: string) => f).join(', ')}.` : ""}`;
-    
-    const estimatedInputTokens = estimateInputTokens(systemPrompt, prompt, userContext + assistantContext);
-    const dynamicMaxTokens = calculateMaxTokens(selectedProvider, estimatedInputTokens, false);
-    const providerConfig = getProviderSpecificConfig(selectedProvider, dynamicMaxTokens);
-    
-    const chatCompletion = client.chatCompletionStream(
-      {
-        model: selectedModel.value,
-        provider: selectedProvider.provider,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: userContext,
-          },
-          {
-            role: "assistant",
-            content: assistantContext,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        ...providerConfig,
+    const encoder = new TextEncoder();
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+
+    const response = new NextResponse(stream.readable, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
-      billTo ? { billTo } : {}
-    );
-
-    // Set up timeout for AI streaming
-    let chunk = "";
-    let timeoutId: NodeJS.Timeout | null = null;
-    let isTimedOut = false;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        isTimedOut = true;
-        reject(new Error('Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.'));
-      }, REQUEST_TIMEOUT);
     });
 
-    try {
-      await Promise.race([
-        (async () => {
-          while (true) {
-            const { done, value } = await chatCompletion.next();
-            if (done) {
-              break;
-            }
-
-            const deltaContent = value.choices[0]?.delta?.content;
-            if (deltaContent) {
-              chunk += deltaContent;
-            }
-          }
-        })(),
-        timeoutPromise
-      ]);
-
-      // Clear timeout if successful
-      if (timeoutId) clearTimeout(timeoutId);
-    } catch (timeoutError: any) {
-      console.error("++TIMEOUT ERROR++", timeoutError);
-      console.error("++TIMEOUT ERROR MESSAGE++", timeoutError.message);
-      // Clear timeout on error
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      if (isTimedOut || timeoutError.message?.includes('timeout') || timeoutError.message?.includes('Request timeout')) {
-        return NextResponse.json(
-          {
-            ok: false,
-            message: "Request timeout: The AI model took too long to respond. Please try again with a simpler prompt or try a different model.",
-          },
-          { status: 504 }
-        );
-      }
-      throw timeoutError;
-    }
-    if (!chunk) {
-      return NextResponse.json(
-        { ok: false, message: "No content returned from the model" },
-        { status: 400 }
-      );
-    }
-
-    if (chunk) {
-      const updatedLines: number[][] = [];
-      let newHtml = "";
-      const updatedPages = [...(pages || [])];
-
-      const updateFileRegex = new RegExp(`${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${UPDATE_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
-      let updateFileMatch;
-      
-      while ((updateFileMatch = updateFileRegex.exec(chunk)) !== null) {
-        const [, filePath, fileContent] = updateFileMatch;
-        
-        const pageIndex = updatedPages.findIndex(p => p.path === filePath);
-        if (pageIndex !== -1) {
-          let pageHtml = updatedPages[pageIndex].html;
-          
-          let processedContent = fileContent;
-          const htmlMatch = fileContent.match(/```html\s*([\s\S]*?)\s*```/);
-          if (htmlMatch) {
-            processedContent = htmlMatch[1];
-          }
-          let position = 0;
-          let moreBlocks = true;
-
-          while (moreBlocks) {
-            const searchStartIndex = processedContent.indexOf(SEARCH_START, position);
-            if (searchStartIndex === -1) {
-              moreBlocks = false;
-              continue;
-            }
-
-            const dividerIndex = processedContent.indexOf(DIVIDER, searchStartIndex);
-            if (dividerIndex === -1) {
-              moreBlocks = false;
-              continue;
-            }
-
-            const replaceEndIndex = processedContent.indexOf(REPLACE_END, dividerIndex);
-            if (replaceEndIndex === -1) {
-              moreBlocks = false;
-              continue;
-            }
-
-            const searchBlock = processedContent.substring(
-              searchStartIndex + SEARCH_START.length,
-              dividerIndex
-            );
-            const replaceBlock = processedContent.substring(
-              dividerIndex + DIVIDER.length,
-              replaceEndIndex
-            );
-
-            if (searchBlock.trim() === "") {
-              pageHtml = `${replaceBlock}\n${pageHtml}`;
-              updatedLines.push([1, replaceBlock.split("\n").length]);
-            } else {
-              const regex = createFlexibleHtmlRegex(searchBlock);
-              const match = regex.exec(pageHtml);
-              
-              if (match) {
-                const matchedText = match[0];
-                const beforeText = pageHtml.substring(0, match.index);
-                const startLineNumber = beforeText.split("\n").length;
-                const replaceLines = replaceBlock.split("\n").length;
-                const endLineNumber = startLineNumber + replaceLines - 1;
-
-                updatedLines.push([startLineNumber, endLineNumber]);
-                pageHtml = pageHtml.replace(matchedText, replaceBlock);
-              }
-            }
-
-            position = replaceEndIndex + REPLACE_END.length;
-          }
-
-          updatedPages[pageIndex].html = pageHtml;
-          
-          if (filePath === '/' || filePath === '/index' || filePath === 'index' || filePath === 'index.html') {
-            newHtml = pageHtml;
-          }
-        }
-      }
-
-      const newFileRegex = new RegExp(`${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${NEW_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`, 'g');
-      let newFileMatch;
-      
-      while ((newFileMatch = newFileRegex.exec(chunk)) !== null) {
-        const [, filePath, fileContent] = newFileMatch;
-        
-        let fileData = fileContent;
-        // Try to extract content from code blocks
-        const htmlMatch = fileContent.match(/```html\s*([\s\S]*?)\s*```/);
-        const cssMatch = fileContent.match(/```css\s*([\s\S]*?)\s*```/);
-        const jsMatch = fileContent.match(/```javascript\s*([\s\S]*?)\s*```/);
-        
-        if (htmlMatch) {
-          fileData = htmlMatch[1];
-        } else if (cssMatch) {
-          fileData = cssMatch[1];
-        } else if (jsMatch) {
-          fileData = jsMatch[1];
-        }
-        
-        const existingFileIndex = updatedPages.findIndex(p => p.path === filePath);
-        
-        if (existingFileIndex !== -1) {
-          updatedPages[existingFileIndex] = {
-            path: filePath,
-            html: fileData.trim()
-          };
-        } else {
-          updatedPages.push({
-            path: filePath,
-            html: fileData.trim()
-          });
-        }
-      }
-
-      if (updatedPages.length === pages?.length && !chunk.includes(UPDATE_FILE_START)) {
-        let position = 0;
-        let moreBlocks = true;
-
-        while (moreBlocks) {
-          const searchStartIndex = chunk.indexOf(SEARCH_START, position);
-          if (searchStartIndex === -1) {
-            moreBlocks = false;
-            continue;
-          }
-
-          const dividerIndex = chunk.indexOf(DIVIDER, searchStartIndex);
-          if (dividerIndex === -1) {
-            moreBlocks = false;
-            continue;
-          }
-
-          const replaceEndIndex = chunk.indexOf(REPLACE_END, dividerIndex);
-          if (replaceEndIndex === -1) {
-            moreBlocks = false;
-            continue;
-          }
-
-          const searchBlock = chunk.substring(
-            searchStartIndex + SEARCH_START.length,
-            dividerIndex
-          );
-          const replaceBlock = chunk.substring(
-            dividerIndex + DIVIDER.length,
-            replaceEndIndex
-          );
-
-          if (searchBlock.trim() === "") {
-            newHtml = `${replaceBlock}\n${newHtml}`;
-            updatedLines.push([1, replaceBlock.split("\n").length]);
-          } else {
-            const regex = createFlexibleHtmlRegex(searchBlock);
-            const match = regex.exec(newHtml);
-            
-            if (match) {
-              const matchedText = match[0];
-              const beforeText = newHtml.substring(0, match.index);
-              const startLineNumber = beforeText.split("\n").length;
-              const replaceLines = replaceBlock.split("\n").length;
-              const endLineNumber = startLineNumber + replaceLines - 1;
-
-              updatedLines.push([startLineNumber, endLineNumber]);
-              newHtml = newHtml.replace(matchedText, replaceBlock);
-            }
-          }
-
-          position = replaceEndIndex + REPLACE_END.length;
-        }
-
-        const mainPageIndex = updatedPages.findIndex(p => p.path === '/' || p.path === '/index' || p.path === 'index');
-        if (mainPageIndex !== -1) {
-          updatedPages[mainPageIndex].html = newHtml;
-        }
-      }
-
-      const files: File[] = [];
-      updatedPages.forEach((page: Page) => {
-        let mimeType = "text/html";
-        if (page.path.endsWith(".css")) {
-          mimeType = "text/css";
-        } else if (page.path.endsWith(".js")) {
-          mimeType = "text/javascript";
-        } else if (page.path.endsWith(".json")) {
-          mimeType = "application/json";
-        }
-        const content = (mimeType === "text/html" && isIndexPage(page.path)) && isNew
-          ? injectDeepSiteBadge(page.html) 
-          : page.html;
-        const file = new File([content], page.path, { type: mimeType });
-        files.push(file);
-      });
-
-      if (isNew) {
-        const projectName = chunk.match(/<<<<<<< PROJECT_NAME_START\s*([\s\S]*?)\s*>>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
-        const formattedTitle = projectName?.toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .split("-")
-          .filter(Boolean)
-          .join("-")
-          .slice(0, 96);
-        const repo: RepoDesignation = {
-          type: "space",
-          name: `${user.name}/${formattedTitle}`,
-        };
-        
-        try {
-          const { repoUrl} = await createRepo({
-            repo,
-            accessToken: user.token as string,
-          });
-          repoId = repoUrl.split("/").slice(-2).join("/");
-        } catch (createRepoError: any) {
-          console.error("++CREATE REPO ERROR++", createRepoError);
-          throw new Error(`Failed to create repository: ${createRepoError.message || 'Unknown error'}`);
-        }
-        
-        const colorFrom = COLORS[Math.floor(Math.random() * COLORS.length)];
-        const colorTo = COLORS[Math.floor(Math.random() * COLORS.length)];
-        const README = `---
-title: ${projectName}
-colorFrom: ${colorFrom}
-colorTo: ${colorTo}
-emoji: 🐳
-sdk: static
-pinned: false
-tags:
-  - deepsite-v3
----
-
-# Welcome to your new DeepSite project!
-This project was created with [DeepSite](https://huggingface.co/deepsite).
-      `;
-        files.push(new File([README], "README.md", { type: "text/markdown" }));
-      }
-
-      let response;
+    (async () => {
       try {
-        // Add a timeout wrapper for the upload
-        const uploadPromise = uploadFiles({
-          repo: {
-            type: "space",
-            name: repoId,
+        const client = new InferenceClient(token);
+
+        const systemPrompt = FOLLOW_UP_SYSTEM_PROMPT + (isNew ? PROMPT_FOR_PROJECT_NAME : "");
+        const userContext = "You are modifying the HTML file based on the user's request.";
+
+        const allPages = pages || [];
+        const pagesContext = allPages
+          .map((p: Page) => `- ${p.path}\n${p.html}`)
+          .join("\n\n");
+
+        const assistantContext = `${selectedElementHtml
+            ? `\n\nYou have to update ONLY the following element, NOTHING ELSE: \n\n\`\`\`html\n${selectedElementHtml}\n\`\`\` Could be in multiple pages, if so, update all the pages.`
+            : ""
+          }. Current pages (${allPages.length} total): ${pagesContext}. ${files?.length > 0 ? `Available images: ${files?.map((f: string) => f).join(', ')}.` : ""}`;
+
+        const estimatedInputTokens = estimateInputTokens(systemPrompt, prompt, userContext + assistantContext);
+        const dynamicMaxTokens = calculateMaxTokens(selectedProvider, estimatedInputTokens, false);
+        const providerConfig = getProviderSpecificConfig(selectedProvider, dynamicMaxTokens);
+
+        const chatCompletion = client.chatCompletionStream(
+          {
+            model: selectedModel.value,
+            provider: selectedProvider.provider,
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt,
+              },
+              {
+                role: "user",
+                content: userContext,
+              },
+              {
+                role: "assistant",
+                content: assistantContext,
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            ...providerConfig,
           },
-          files,
-          commitTitle: prompt,
-          accessToken: user.token as string,
-        });
-        
-        const uploadTimeout = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            reject(new Error('Upload operation timed out'));
-          }, 180000); // 3 minutes timeout for upload
-        });
-        
-        response = await Promise.race([uploadPromise, uploadTimeout]);
-      } catch (uploadError: any) {
-        console.error("++UPLOAD FILES ERROR++", uploadError);
-        console.error("++UPLOAD FILES ERROR MESSAGE++", uploadError.message);
-        console.error("++REPO ID++", repoId);
-        
-        // If it's a timeout, files might have been uploaded but we didn't get response
-        if (uploadError.message?.includes('timed out') || uploadError.message?.includes('timeout')) {
-          console.warn("++UPLOAD TIMEOUT - Files may have been uploaded++");
-          // Return a partial success response
-          return NextResponse.json({
-            ok: true,
-            updatedLines,
-            pages: updatedPages,
-            repoId,
-            commit: {
-              title: prompt,
-              oid: 'timeout',
-              timedOut: true,
-            }
-          });
+          billTo ? { billTo } : {}
+        );
+
+        // Stream the response chunks to the client
+        while (true) {
+          const { done, value } = await chatCompletion.next();
+          if (done) {
+            break;
+          }
+
+          const chunk = value.choices[0]?.delta?.content;
+          if (chunk) {
+            await writer.write(encoder.encode(chunk));
+          }
         }
-        
-        throw new Error(`Failed to upload files to repository: ${uploadError.message || 'Unknown error'}`);
-      }
-      const responseData: any = {
-        ok: true,
-        updatedLines,
-        pages: updatedPages,
-        repoId,
-      };
 
-      if (response && response.commit) {
-        responseData.commit = {
-          ...response.commit,
-          title: prompt,
-        };
-      } else {
-        responseData.commit = {
-          title: prompt,
-          oid: 'unknown',
-        };
-      }
+        await writer.write(encoder.encode(`\n___METADATA_START___\n${JSON.stringify({
+          repoId,
+          isNew,
+          userName: user.name,
+        })}\n___METADATA_END___\n`));
 
-      return NextResponse.json(responseData);
-    } else {
-      return NextResponse.json(
-        { ok: false, message: "No content returned from the model" },
-        { status: 400 }
-      );
-    }
+        await writer.close();
+      } catch (error: any) {
+        if (error.message?.includes("exceeded your monthly included credits")) {
+          await writer.write(
+            encoder.encode(
+              JSON.stringify({
+                ok: false,
+                openProModal: true,
+                message: error.message,
+              })
+            )
+          );
+        } else if (error?.message?.includes("inference provider information")) {
+          await writer.write(
+            encoder.encode(
+              JSON.stringify({
+                ok: false,
+                openSelectProvider: true,
+                message: error.message,
+              })
+            )
+          );
+        } else {
+          await writer.write(
+            encoder.encode(
+              JSON.stringify({
+                ok: false,
+                message:
+                  error.message ||
+                  "An error occurred while processing your request.",
+              })
+            )
+          );
+        }
+      } finally {
+        try {
+          await writer?.close();
+        } catch {
+          // ignore
+        }
+      }
+    })();
+
+    return response;
   } catch (error: any) {
-    console.error("++ERROR++", error);
-    console.error("++ERROR MESSAGE++", error.message);
-    if (error.message?.includes('timeout') || error.message?.includes('Request timeout')) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: "Request timeout: The operation took too long to complete. Please try again with a simpler request or try a different model.",
-        },
-        { status: 504 }
-      );
-    }
-    if (error.message?.includes("exceeded your monthly included credits")) {
-      return NextResponse.json(
-        {
-          ok: false,
-          openProModal: true,
-          message: error.message,
-        },
-        { status: 402 }
-      );
-    }
     return NextResponse.json(
       {
         ok: false,

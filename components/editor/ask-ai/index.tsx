@@ -100,7 +100,8 @@ export const AskAi = ({
         prompt,
         enhancedSettings,
         redesignMarkdown,
-        !!user
+        !!user,
+        user?.name
       );
 
       if (result?.error) {

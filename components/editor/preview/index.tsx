@@ -72,7 +72,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     (html: string): string => {
       if (!html) return html;
 
-      // Find all CSS and JS files (including those in subdirectories)
       const cssFiles = pages.filter(
         (p) => p.path.endsWith(".css") && p.path !== previewPageData?.path
       );
@@ -102,11 +101,9 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
             `<head>\n${allCssContent}`
           );
         } else {
-          // If no head tag, prepend to document
           modifiedHtml = allCssContent + "\n" + modifiedHtml;
         }
 
-        // Remove all link tags that reference CSS files we're injecting
         cssFiles.forEach((file) => {
           const escapedPath = file.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           modifiedHtml = modifiedHtml.replace(
@@ -119,7 +116,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         });
       }
 
-      // Inject all JS files
       if (jsFiles.length > 0) {
         const allJsContent = jsFiles
           .map(
@@ -136,11 +132,9 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         } else if (modifiedHtml.includes("<body>")) {
           modifiedHtml = modifiedHtml + allJsContent;
         } else {
-          // If no body tag, append to document
           modifiedHtml = modifiedHtml + "\n" + allJsContent;
         }
 
-        // Remove all script tags that reference JS files we're injecting
         jsFiles.forEach((file) => {
           const escapedPath = file.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           modifiedHtml = modifiedHtml.replace(
@@ -214,7 +208,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     if (iframeRef?.current?.contentDocument) {
       const iframeDocument = iframeRef.current.contentDocument;
 
-      // Use event delegation to catch clicks on anchors in both light and shadow DOM
       iframeDocument.addEventListener(
         "click",
         handleCustomNavigation as any,
@@ -323,18 +316,11 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         const path = event.composedPath();
         const targetElement = path[0] as HTMLElement;
 
-        console.log(
-          "[handleClick] Target element:",
-          targetElement.tagName,
-          targetElement
-        );
-
         const findClosestAnchor = (
           element: HTMLElement
         ): HTMLAnchorElement | null => {
           let current: HTMLElement | null = element;
           while (current) {
-            console.log("[handleClick] Checking element:", current.tagName);
             if (current.tagName?.toUpperCase() === "A") {
               return current as HTMLAnchorElement;
             }
@@ -342,13 +328,9 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
               break;
             }
             const parent: Node | null = current.parentNode;
-            // Use nodeType to check - works across iframe boundaries
-            // nodeType 1 = Element, nodeType 11 = DocumentFragment (including ShadowRoot)
             if (parent && parent.nodeType === 11) {
-              // ShadowRoot
               current = (parent as ShadowRoot).host as HTMLElement;
             } else if (parent && parent.nodeType === 1) {
-              // Element node
               current = parent as HTMLElement;
             } else {
               break;
@@ -358,8 +340,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         };
 
         const anchorElement = findClosestAnchor(targetElement);
-
-        console.log("[handleClick] Found anchor:", anchorElement);
 
         if (anchorElement) {
           return;
@@ -379,49 +359,23 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         const path = event.composedPath();
         const actualTarget = path[0] as HTMLElement;
 
-        console.log(
-          "[handleCustomNavigation] Click detected in iframe:",
-          actualTarget.tagName,
-          actualTarget
-        );
-
         const findClosestAnchor = (
           element: HTMLElement
         ): HTMLAnchorElement | null => {
           let current: HTMLElement | null = element;
           while (current) {
-            console.log(
-              "[handleCustomNavigation] Checking element:",
-              current.tagName,
-              current
-            );
             if (current.tagName?.toUpperCase() === "A") {
-              console.log("[handleCustomNavigation] Found anchor!", current);
               return current as HTMLAnchorElement;
             }
             if (current === iframeDocument.body) {
-              console.log("[handleCustomNavigation] Reached body, stopping");
               break;
             }
             const parent: Node | null = current.parentNode;
-            console.log(
-              "[handleCustomNavigation] Parent node:",
-              parent,
-              "nodeType:",
-              parent?.nodeType
-            );
-            // Use nodeType to check - works across iframe boundaries
-            // nodeType 1 = Element, nodeType 11 = DocumentFragment (including ShadowRoot)
             if (parent && parent.nodeType === 11) {
-              // ShadowRoot
               current = (parent as ShadowRoot).host as HTMLElement;
             } else if (parent && parent.nodeType === 1) {
-              // Element node
               current = parent as HTMLElement;
             } else {
-              console.log(
-                "[handleCustomNavigation] Parent is not an element node, breaking"
-              );
               break;
             }
           }
@@ -429,7 +383,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         };
 
         const anchorElement = findClosestAnchor(actualTarget);
-        console.log("[handleCustomNavigation] Anchor element:", anchorElement);
         if (anchorElement) {
           let href = anchorElement.getAttribute("href");
           if (href) {
@@ -573,7 +526,6 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
                         }
                       );
                     }
-                    // Set up event listeners after iframe loads
                     setupIframeListeners();
                   }
                 : undefined
@@ -583,7 +535,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
           />
           {!isNew && (
             <>
-              <div
+              {/* <div
                 className={classNames(
                   "w-full h-full flex items-center justify-center absolute left-0 top-0 bg-black/40 backdrop-blur-lg transition-all duration-200",
                   {
@@ -601,7 +553,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
                   <AnimatedBlobs />
                   <AnimatedBlobs />
                 </div>
-              </div>
+              </div> */}
               <HistoryNotification
                 isVisible={!!currentCommit}
                 isPromotingVersion={isPromotingVersion}

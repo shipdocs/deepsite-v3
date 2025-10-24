@@ -124,27 +124,37 @@ export const useAi = (onScrollToBottom?: () => void) => {
     client.setQueryData(["ai.model"], newModel);
   };
 
-  const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined, isLoggedIn?: boolean) => {
-    if (isLoggedIn) {
-      api.post("/me/projects", {
-        title: projectName,
-        pages: htmlPages,
-        prompt,
-      })
-      .then((response) => {
-        if (response.data.ok) {
-          setIsAiWorking(false);
-          router.replace(`/${response.data.space.project.space_id}`);
-          setProject(response.data.space);
-          setProjects([...projects, response.data.space]);
-          toast.success("AI responded successfully");
-          if (audio.current) audio.current.play();
+  const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined, isLoggedIn?: boolean, userName?: string) => {
+    if (isLoggedIn && userName) {
+      try {
+        const uploadRequest = await fetch(`/deepsite/api/me/projects/${userName}/new/update`, {
+          method: "PUT",
+          body: JSON.stringify({
+            pages: htmlPages,
+            commitTitle: prompt,
+            isNew: true,
+            projectName,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        const uploadRes = await uploadRequest.json();
+        
+        if (!uploadRequest.ok || !uploadRes.ok) {
+          throw new Error(uploadRes.error || "Failed to create project");
         }
-      })
-      .catch((error) => {
+
         setIsAiWorking(false);
-        toast.error(error?.response?.data?.message || error?.message || "Failed to create project");
-      });
+        router.replace(`/${uploadRes.repoId}`);
+        toast.success("AI responded successfully");
+        if (audio.current) audio.current.play();
+      } catch (error: any) {
+        setIsAiWorking(false);
+        toast.error(error?.message || "Failed to create project");
+      }
     } else {
       setIsAiWorking(false);
       toast.success("AI responded successfully");
@@ -152,7 +162,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
     }
   }
   
-  const callAiNewProject = async (prompt: string, enhancedSettings?: EnhancedSettings, redesignMarkdown?: string, isLoggedIn?: boolean) => {
+  const callAiNewProject = async (prompt: string, enhancedSettings?: EnhancedSettings, redesignMarkdown?: string, isLoggedIn?: boolean, userName?: string) => {
     if (isAiWorking) return;
     if (!redesignMarkdown && !prompt.trim()) return;
     
@@ -218,7 +228,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
             setPages(newPages);
             setLastSavedPages([...newPages]);
             if (newPages.length > 0 && !isTheSameHtml(newPages[0].html)) {
-              createNewProject(prompt, newPages, projectName, isLoggedIn);
+              createNewProject(prompt, newPages, projectName, isLoggedIn, userName);
             }
             setPrompts([...prompts, prompt]);
 
@@ -311,118 +321,162 @@ export const useAi = (onScrollToBottom?: () => void) => {
       });
 
       if (request && request.body) {
-        if (request.status === 504) {
-          console.warn("++504 GATEWAY TIMEOUT - Upload likely succeeded but response timed out++");
-          console.warn("++REQUEST STATUS++", request.status);
-          console.warn("++REQUEST BODY++", request.body);
+        const reader = request.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let contentResponse = "";
+        let metadata: any = null;
+
+        const read = async (): Promise<any> => {
+          const { done, value } = await reader.read();
           
-          setIsAiWorking(false);
-          
-          if (isNew) {
-            toast.error("The request timed out. Your project may have been created. Please check your HuggingFace spaces.");
-            return { error: "gateway_timeout", message: "Request timed out after upload" };
-          }
-          
-          toast.success("Changes saved! Refreshing page to show updates...", { duration: 3000 });
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-          return { success: true, timedOut: true };
-        }
-        
-        const clonedRequest = request.clone();
-        let res;
-        try {
-          res = await request.json();
-        } catch (jsonError: any) {
-          try {
-            const text = await clonedRequest.text();
-            
-            // Check if it's a CloudFront/gateway timeout in the HTML
-            if (text.includes("504") || text.includes("Gateway Timeout") || text.includes("gateway timeout")) {
-              console.warn("++DETECTED 504 IN HTML RESPONSE++");
-              setIsAiWorking(false);
-              
-              if (isNew) {
-                toast.error("The request timed out. Your project may have been created. Please check your HuggingFace spaces.");
-                return { error: "gateway_timeout", message: "Request timed out after upload" };
+          if (done) {
+            const metadataMatch = contentResponse.match(/___METADATA_START___([\s\S]*?)___METADATA_END___/);
+            if (metadataMatch) {
+              try {
+                metadata = JSON.parse(metadataMatch[1]);
+                contentResponse = contentResponse.replace(/___METADATA_START___[\s\S]*?___METADATA_END___/, '').trim();
+              } catch (e) {
+                console.error("Failed to parse metadata", e);
               }
+            }
+
+            const trimmedResponse = contentResponse.trim();
+            if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
+              try {
+                const jsonResponse = JSON.parse(trimmedResponse);
+                if (jsonResponse && !jsonResponse.ok) {
+                  setIsAiWorking(false);
+                  if (jsonResponse.openLogin) {
+                    return { error: "login_required" };
+                  } else if (jsonResponse.openSelectProvider) {
+                    return { error: "provider_required", message: jsonResponse.message };
+                  } else if (jsonResponse.openProModal) {
+                    return { error: "pro_required" };
+                  } else {
+                    toast.error(jsonResponse.message);
+                    return { error: "api_error", message: jsonResponse.message };
+                  }
+                }
+              } catch (e) {
+                // Not JSON, continue with normal processing
+              }
+            }
+            
+            const { processAiResponse, extractProjectName } = await import("@/lib/format-ai-response");
+            const { updatedPages, updatedLines } = processAiResponse(contentResponse, pagesToSend);
+            
+            const updatedPagesMap = new Map(updatedPages.map((p: Page) => [p.path, p]));
+            const mergedPages: Page[] = pages.map(page => 
+              updatedPagesMap.has(page.path) ? updatedPagesMap.get(page.path)! : page
+            );
+            updatedPages.forEach((page: Page) => {
+              if (!pages.find(p => p.path === page.path)) {
+                mergedPages.push(page);
+              }
+            });
+
+            let projectName = null;
+            if (isNew) {
+              projectName = extractProjectName(contentResponse);
+              if (!projectName) {
+                projectName = prompt.substring(0, 40).replace(/[^a-zA-Z0-9]/g, "-").slice(0, 40) + "-" + Math.random().toString(36).substring(2, 15);
+              }
+            }
+
+            try {
+              const uploadRequest = await fetch(`/deepsite/api/me/projects/${metadata?.userName || 'unknown'}/${isNew ? 'new' : (project?.space_id?.split('/')[1] || 'unknown')}/update`, {
+                method: "PUT",
+                body: JSON.stringify({
+                  pages: mergedPages,
+                  commitTitle: prompt,
+                  isNew,
+                  projectName,
+                }),
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`,
+                },
+              });
+
+              const uploadRes = await uploadRequest.json();
               
-              toast.success("Changes saved! Refreshing page to show updates...", { duration: 3000 });
-              setTimeout(() => {
-                window.location.reload();
-              }, 1000);
-              return { success: true, timedOut: true };
-            }
-          } catch (textError) {
-          }
-          setIsAiWorking(false);
-          toast.error("Server returned invalid response. Check console for details.");
-          return { error: "invalid_response", message: "Server returned non-JSON response" };
-        }
-        
-        if (!request.ok) {
-          if (res.openLogin) {
-            setIsAiWorking(false);
-            return { error: "login_required" };
-          } else if (res.openSelectProvider) {
-            setIsAiWorking(false);
-            return { error: "provider_required", message: res.message };
-          } else if (res.openProModal) {
-            setIsAiWorking(false);
-            return { error: "pro_required" };
-          } else {
-            setIsAiWorking(false);
-            return { error: "api_error", message: res.message };
-          }
-        }
+              if (!uploadRequest.ok || !uploadRes.ok) {
+                throw new Error(uploadRes.error || "Failed to upload to HuggingFace");
+              }
 
-        toast.success("AI responded successfully");
-        const iframe = document.getElementById(
-          "preview-iframe"
-        ) as HTMLIFrameElement;
+              toast.success("AI responded successfully");
+              const iframe = document.getElementById("preview-iframe") as HTMLIFrameElement;
 
-        if (isNew && res.repoId) {
-          router.push(`/${res.repoId}`);
-          setIsAiWorking(false);
-        } else {
-          const returnedPages = res.pages as Page[];
-          const updatedPagesMap = new Map(returnedPages.map((p: Page) => [p.path, p]));
-          const mergedPages: Page[] = pages.map(page => 
-            updatedPagesMap.has(page.path) ? updatedPagesMap.get(page.path)! : page
-          );
-          returnedPages.forEach((page: Page) => {
-            if (!pages.find(p => p.path === page.path)) {
-              mergedPages.push(page);
+              if (isNew && uploadRes.repoId) {
+                router.push(`/${uploadRes.repoId}`);
+                setIsAiWorking(false);
+              } else {
+                setPages(mergedPages);
+                setLastSavedPages([...mergedPages]);
+                setCommits([uploadRes.commit, ...commits]);
+                setPrompts([...prompts, prompt]);
+                setSelectedElement(null);
+                setSelectedFiles([]);
+                setIsEditableModeEnabled(false);
+                setIsAiWorking(false);
+              }
+
+              if (audio.current) audio.current.play();
+              if (iframe) {
+                setTimeout(() => {
+                  iframe.src = iframe.src;
+                }, 500);
+              }
+
+              return { success: true, updatedLines };
+            } catch (uploadError: any) {
+              setIsAiWorking(false);
+              toast.error(uploadError.message || "Failed to save changes");
+              return { error: "upload_error", message: uploadError.message };
             }
-          });
+          }
+
+          const chunk = decoder.decode(value, { stream: true });
+          contentResponse += chunk;
           
-          setPages(mergedPages);
-          setLastSavedPages([...mergedPages]);
-          setCommits([res.commit, ...commits]);
-          setPrompts(
-            [...prompts, prompt]
-          )
-          setSelectedElement(null);
-          setSelectedFiles([]);
-          // setContextFile(null); not needed yet, keep context for the next request.
-          setIsEditableModeEnabled(false);
-          setIsAiWorking(false);
-        }
+          // Check for error responses during streaming
+          const trimmedResponse = contentResponse.trim();
+          if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
+            try {
+              const jsonResponse = JSON.parse(trimmedResponse);
+              if (jsonResponse && !jsonResponse.ok) {
+                setIsAiWorking(false);
+                if (jsonResponse.openLogin) {
+                  return { error: "login_required" };
+                } else if (jsonResponse.openSelectProvider) {
+                  return { error: "provider_required", message: jsonResponse.message };
+                } else if (jsonResponse.openProModal) {
+                  return { error: "pro_required" };
+                } else {
+                  toast.error(jsonResponse.message);
+                  return { error: "api_error", message: jsonResponse.message };
+                }
+              }
+            } catch (e) {
+              // Not complete JSON yet, continue
+            }
+          }
+          
+          return read();
+        };
 
-        if (audio.current) audio.current.play();
-        if (iframe) {
-          setTimeout(() => {
-            iframe.src = iframe.src;
-          }, 500);
-        }
-
-        return { success: true, html: res.html, updatedLines: res.updatedLines };
+        return await read();
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       setIsAiWorking(false);
-      toast.error(error.message);
+      setIsThinking(false);
+      setController(null);
+      
+      if (!abortController.signal.aborted) {
+        toast.error(error.message || "Network error occurred");
+      }
+      
       if (error.openLogin) {
         return { error: "login_required" };
       }
@@ -470,7 +524,6 @@ export const useAi = (onScrollToBottom?: () => void) => {
     if (pages.length > 0) {
       setPages(pages);
       if (isStreaming) {
-        // Find new pages that haven't been shown yet (HTML, CSS, JS, etc.)
         const newPages = pages.filter(p => 
           !streamingPagesRef.current.has(p.path)
         );
@@ -480,7 +533,6 @@ export const useAi = (onScrollToBottom?: () => void) => {
           setCurrentPage(newPage.path);
           streamingPagesRef.current.add(newPage.path);
           
-          // Update preview if it's an HTML file not in components folder
           if (newPage.path.endsWith('.html') && !newPage.path.includes('/components/')) {
             setPreviewPage(newPage.path);
           }
@@ -500,41 +552,30 @@ export const useAi = (onScrollToBottom?: () => void) => {
   const extractFileContent = (chunk: string, filePath: string): string => {
     if (!chunk) return "";
     
-    // Remove backticks first
     let content = chunk.trim();
     
-    // Handle different file types
     if (filePath.endsWith('.css')) {
-      // Try to extract CSS from complete code blocks first
       const cssMatch = content.match(/```css\s*([\s\S]*?)\s*```/);
       if (cssMatch) {
         content = cssMatch[1];
       } else {
-        // Handle incomplete code blocks during streaming (remove opening fence)
         content = content.replace(/^```css\s*/i, "");
       }
-      // Remove any remaining backticks
       return content.replace(/```/g, "").trim();
     } else if (filePath.endsWith('.js')) {
-      // Try to extract JavaScript from complete code blocks first
       const jsMatch = content.match(/```(?:javascript|js)\s*([\s\S]*?)\s*```/);
       if (jsMatch) {
         content = jsMatch[1];
       } else {
-        // Handle incomplete code blocks during streaming (remove opening fence)
         content = content.replace(/^```(?:javascript|js)\s*/i, "");
       }
-      // Remove any remaining backticks
       return content.replace(/```/g, "").trim();
     } else {
-      // Handle HTML files
       const htmlMatch = content.match(/```html\s*([\s\S]*?)\s*```/);
       if (htmlMatch) {
         content = htmlMatch[1];
       } else {
-        // Handle incomplete code blocks during streaming (remove opening fence)
         content = content.replace(/^```html\s*/i, "");
-        // Try to find HTML starting with DOCTYPE
         const doctypeMatch = content.match(/<!DOCTYPE html>[\s\S]*/);
         if (doctypeMatch) {
           content = doctypeMatch[0];
