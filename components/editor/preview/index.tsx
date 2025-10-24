@@ -535,7 +535,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
           />
           {!isNew && (
             <>
-              {/* <div
+              <div
                 className={classNames(
                   "w-full h-full flex items-center justify-center absolute left-0 top-0 bg-black/40 backdrop-blur-lg transition-all duration-200",
                   {
@@ -553,7 +553,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
                   <AnimatedBlobs />
                   <AnimatedBlobs />
                 </div>
-              </div> */}
+              </div>
               <HistoryNotification
                 isVisible={!!currentCommit}
                 isPromotingVersion={isPromotingVersion}
