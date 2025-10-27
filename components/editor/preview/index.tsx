@@ -559,18 +559,18 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
             !hasUnsavedChanges &&
             !currentCommit &&
             project?.private && (
-              <div className="top-0 left-0 right-0 z-20 bg-blue-500/90 backdrop-blur-sm border-b border-blue-600 px-4 py-2 flex items-center justify-between gap-3 text-sm w-full">
+              <div className="top-0 left-0 right-0 z-20 bg-amber-500/90 backdrop-blur-sm border-b border-amber-600 px-4 py-2 flex items-center justify-between gap-3 text-sm w-full">
                 <div className="flex items-center gap-2 flex-1">
-                  <TriangleAlert className="size-4 text-blue-900 flex-shrink-0" />
-                  <span className="text-blue-900 font-medium">
+                  <TriangleAlert className="size-4 text-amber-900 flex-shrink-0" />
+                  <span className="text-amber-900 font-medium">
                     Private project preview. Some features may not work.
                   </span>
                 </div>
                 <button
                   onClick={refreshIframe}
-                  className="px-3 py-1 bg-blue-900 hover:bg-blue-800 text-blue-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
+                  className="px-3 py-1 bg-amber-900 hover:bg-amber-800 text-amber-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
                 >
-                  <RefreshCcw className="size-4 text-blue-50 flex-shrink-0" />
+                  <RefreshCcw className="size-4 text-amber-50 flex-shrink-0" />
                   Refresh
                 </button>
               </div>
