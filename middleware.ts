@@ -7,9 +7,8 @@ export function middleware(request: NextRequest) {
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
   const isCorrectDomain = host === "huggingface.co" || host.startsWith("huggingface.co:");
 
-  console.log("++ DOMAIN CHECK ++", host)
   if (!isCorrectDomain && !isLocalhost) {
-    return NextResponse.redirect("https://huggingface.co/deepsite", 301);
+    return NextResponse.redirect(new URL("https://huggingface.co/deepsite"), 301);
   }
 
   const headers = new Headers(request.headers);
