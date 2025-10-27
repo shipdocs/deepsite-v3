@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const hostname = request.nextUrl.hostname;
-  const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.");
+  // Get the actual hostname from headers (important for proxied environments like HF Spaces)
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = request.headers.get("host");
+  const hostname = forwardedHost || host || request.nextUrl.hostname;
+  
+  console.log("[Middleware] x-forwarded-host:", forwardedHost, "host:", host, "hostname:", hostname);
+  
+  const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("localhost:") || hostname.startsWith("127.0.0.1:");
   const isHuggingFace = hostname === "huggingface.co" || hostname.endsWith(".huggingface.co");
   
-  console.log("[Middleware] hostname:", hostname, "isHuggingFace:", isHuggingFace, "isLocalDev:", isLocalDev);
+  console.log("[Middleware] isHuggingFace:", isHuggingFace, "isLocalDev:", isLocalDev);
   
   if (!isHuggingFace && !isLocalDev) {
     console.log("[Middleware] Redirecting to huggingface.co");
