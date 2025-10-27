@@ -6,8 +6,11 @@ export function middleware(request: NextRequest) {
   const isLocalDev = hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.");
   const isHuggingFace = hostname === "huggingface.co" || hostname.endsWith(".huggingface.co");
   
+  console.log("[Middleware] hostname:", hostname, "isHuggingFace:", isHuggingFace, "isLocalDev:", isLocalDev);
+  
   if (!isHuggingFace && !isLocalDev) {
-    const canonicalUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, "https://huggingface.co");
+    console.log("[Middleware] Redirecting to huggingface.co");
+    const canonicalUrl = new URL("https://huggingface.co/deepsite");
     canonicalUrl.pathname = request.nextUrl.pathname;
     canonicalUrl.search = request.nextUrl.search;
     return NextResponse.redirect(canonicalUrl, 301);
