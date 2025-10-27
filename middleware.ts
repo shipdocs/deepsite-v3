@@ -2,15 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const host = request.headers.get("host") || "";
-
-  const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
-  const isCorrectDomain = host === "huggingface.co" || host.startsWith("huggingface.co:");
-
-  if (!isCorrectDomain && !isLocalhost) {
-    return NextResponse.redirect(new URL("https://huggingface.co/deepsite"), 301);
-  }
-
   const headers = new Headers(request.headers);
   headers.set("x-current-host", request.nextUrl.host);
   
