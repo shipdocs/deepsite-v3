@@ -110,6 +110,7 @@ export function Header() {
               </Button>
             </Link>
           )}
+
           {project?.private && (
             <Tooltip>
               <TooltipTrigger>
