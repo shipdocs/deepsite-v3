@@ -16,8 +16,17 @@ import { HistoryNotification } from "../history-notification";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { RefreshCcw, TriangleAlert } from "lucide-react";
+import { Page } from "@/types";
 
-export const Preview = ({ isNew }: { isNew: boolean }) => {
+export const Preview = ({
+  isNew,
+  namespace,
+  repoId,
+}: {
+  isNew: boolean;
+  namespace?: string;
+  repoId?: string;
+}) => {
   const {
     project,
     device,
@@ -52,6 +61,9 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
   const [throttledHtml, setThrottledHtml] = useState<string>("");
   const lastUpdateTimeRef = useRef<number>(0);
   const [iframeKey, setIframeKey] = useState(0);
+  const [commitPages, setCommitPages] = useState<Page[]>([]);
+  const [isLoadingCommitPages, setIsLoadingCommitPages] = useState(false);
+  const prevCommitRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!previewPage && pages.length > 0) {
@@ -63,30 +75,188 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     }
   }, [pages, previewPage]);
 
+  const pagesToUse = currentCommit ? commitPages : pages;
+
   const previewPageData = useMemo(() => {
-    const found = pages.find((p) => {
+    const found = pagesToUse.find((p) => {
       const normalizedPagePath = p.path.replace(/^\.?\//, "");
       const normalizedPreviewPage = previewPage.replace(/^\.?\//, "");
       return normalizedPagePath === normalizedPreviewPage;
     });
-    return found || currentPageData;
-  }, [pages, previewPage, currentPageData]);
+    return found || (pagesToUse.length > 0 ? pagesToUse[0] : currentPageData);
+  }, [pagesToUse, previewPage, currentPageData]);
+
+  // Fetch commit pages when currentCommit changes
+  useEffect(() => {
+    if (currentCommit && namespace && repoId) {
+      setIsLoadingCommitPages(true);
+      api
+        .get(`/me/projects/${namespace}/${repoId}/commits/${currentCommit}`)
+        .then((res) => {
+          if (res.data.ok) {
+            setCommitPages(res.data.pages);
+            // Set preview page to index.html if available
+            const indexPage = res.data.pages.find(
+              (p: Page) =>
+                p.path === "index.html" || p.path === "index" || p.path === "/"
+            );
+            if (indexPage) {
+              setPreviewPage(indexPage.path);
+            }
+            // Refresh iframe to show commit version
+            setIframeKey((prev) => prev + 1);
+          }
+        })
+        .catch((err) => {
+          toast.error(
+            err.response?.data?.error || "Failed to fetch commit pages"
+          );
+        })
+        .finally(() => {
+          setIsLoadingCommitPages(false);
+        });
+    } else if (!currentCommit && prevCommitRef.current !== null) {
+      // Only clear commitPages when transitioning from a commit to no commit
+      setCommitPages([]);
+    }
+    prevCommitRef.current = currentCommit;
+  }, [currentCommit, namespace, repoId]);
+
+  // Create navigation interception script
+  const createNavigationScript = useCallback((availablePages: Page[]) => {
+    const pagePaths = availablePages.map((p) => p.path.replace(/^\.?\//, ""));
+    return `
+      (function() {
+        const availablePages = ${JSON.stringify(pagePaths)};
+        
+        function normalizePath(path) {
+          let normalized = path.replace(/^\.?\//, "");
+          if (normalized === "" || normalized === "/") {
+            normalized = "index.html";
+          }
+          const hashIndex = normalized.indexOf("#");
+          if (hashIndex !== -1) {
+            normalized = normalized.substring(0, hashIndex);
+          }
+          if (!normalized.includes(".")) {
+            normalized = normalized + ".html";
+          }
+          return normalized;
+        }
+        
+        function handleNavigation(url) {
+          if (!url) return;
+          
+          // Handle hash-only navigation
+          if (url.startsWith("#")) {
+            const targetElement = document.querySelector(url);
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: "smooth" });
+            }
+            // Search in shadow DOM
+            const searchInShadows = (root) => {
+              const elements = root.querySelectorAll("*");
+              for (const el of elements) {
+                if (el.shadowRoot) {
+                  const found = el.shadowRoot.querySelector(url);
+                  if (found) {
+                    found.scrollIntoView({ behavior: "smooth" });
+                    return;
+                  }
+                  searchInShadows(el.shadowRoot);
+                }
+              }
+            };
+            searchInShadows(document);
+            return;
+          }
+          
+          // Handle external URLs
+          if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//")) {
+            window.open(url, "_blank");
+            return;
+          }
+          
+          const normalizedPath = normalizePath(url);
+          if (availablePages.includes(normalizedPath)) {
+            // Dispatch custom event to notify parent
+            window.parent.postMessage({ type: 'navigate', path: normalizedPath }, '*');
+          } else {
+            console.warn('Page not found:', normalizedPath);
+          }
+        }
+        
+        // Intercept window.location methods
+        const originalAssign = window.location.assign;
+        const originalReplace = window.location.replace;
+        
+        window.location.assign = function(url) {
+          handleNavigation(url);
+        };
+        
+        window.location.replace = function(url) {
+          handleNavigation(url);
+        };
+        
+        // Intercept window.location.href setter
+        try {
+          let currentHref = window.location.href;
+          Object.defineProperty(window.location, 'href', {
+            get: function() {
+              return currentHref;
+            },
+            set: function(url) {
+              handleNavigation(url);
+            },
+            configurable: true
+          });
+        } catch (e) {
+          // Fallback: use proxy if defineProperty fails
+          console.warn('Could not intercept location.href:', e);
+        }
+        
+        // Intercept link clicks
+        document.addEventListener('click', function(e) {
+          const anchor = e.target.closest('a');
+          if (anchor && anchor.href) {
+            const href = anchor.getAttribute('href');
+            if (href && !href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('//') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+              e.preventDefault();
+              handleNavigation(href);
+            }
+          }
+        }, true);
+        
+        // Intercept form submissions
+        document.addEventListener('submit', function(e) {
+          const form = e.target;
+          if (form.action && !form.action.startsWith('http://') && !form.action.startsWith('https://') && !form.action.startsWith('//')) {
+            e.preventDefault();
+            handleNavigation(form.action);
+          }
+        }, true);
+      })();
+    `;
+  }, []);
 
   const injectAssetsIntoHtml = useCallback(
-    (html: string): string => {
+    (html: string, pagesToUse: Page[] = pages): string => {
       if (!html) return html;
 
-      const cssFiles = pages.filter(
+      const cssFiles = pagesToUse.filter(
         (p) => p.path.endsWith(".css") && p.path !== previewPageData?.path
       );
-      const jsFiles = pages.filter(
+      const jsFiles = pagesToUse.filter(
         (p) => p.path.endsWith(".js") && p.path !== previewPageData?.path
       );
-      const jsonFiles = pages.filter(
+      const jsonFiles = pagesToUse.filter(
         (p) => p.path.endsWith(".json") && p.path !== previewPageData?.path
       );
 
       let modifiedHtml = html;
+
+      // Inject navigation script for srcDoc
+      const navigationScript = createNavigationScript(pagesToUse);
 
       // Inject all CSS files
       if (cssFiles.length > 0) {
@@ -190,9 +360,33 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         });
       }
 
+      // Inject navigation script early in the document
+      if (navigationScript) {
+        // Try to inject right after <head> or <body> opening tag
+        if (modifiedHtml.includes("<head>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "<head>",
+            `<head>\n<script>${navigationScript}</script>`
+          );
+        } else if (modifiedHtml.includes("<body>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "<body>",
+            `<body>\n<script>${navigationScript}</script>`
+          );
+        } else if (modifiedHtml.includes("</body>")) {
+          modifiedHtml = modifiedHtml.replace(
+            "</body>",
+            `<script>${navigationScript}</script>\n</body>`
+          );
+        } else {
+          modifiedHtml =
+            `<script>${navigationScript}</script>\n` + modifiedHtml;
+        }
+      }
+
       return modifiedHtml;
     },
-    [pages, previewPageData?.path]
+    [pages, previewPageData?.path, createNavigationScript]
   );
 
   useEffect(() => {
@@ -201,24 +395,33 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
       const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
 
       if (lastUpdateTimeRef.current === 0 || timeSinceLastUpdate >= 3000) {
-        const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+        const processedHtml = injectAssetsIntoHtml(
+          previewPageData.html,
+          pagesToUse
+        );
         setThrottledHtml(processedHtml);
         lastUpdateTimeRef.current = now;
       } else {
         const timeUntilNextUpdate = 3000 - timeSinceLastUpdate;
         const timer = setTimeout(() => {
-          const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+          const processedHtml = injectAssetsIntoHtml(
+            previewPageData.html,
+            pagesToUse
+          );
           setThrottledHtml(processedHtml);
           lastUpdateTimeRef.current = Date.now();
         }, timeUntilNextUpdate);
         return () => clearTimeout(timer);
       }
     }
-  }, [isNew, previewPageData?.html, injectAssetsIntoHtml]);
+  }, [isNew, previewPageData?.html, injectAssetsIntoHtml, pagesToUse]);
 
   useEffect(() => {
     if (!isAiWorking && !globalAiLoading && previewPageData?.html) {
-      const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+      const processedHtml = injectAssetsIntoHtml(
+        previewPageData.html,
+        pagesToUse
+      );
       setStableHtml(processedHtml);
     }
   }, [
@@ -227,6 +430,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     previewPageData?.html,
     injectAssetsIntoHtml,
     previewPage,
+    pagesToUse,
   ]);
 
   useEffect(() => {
@@ -236,7 +440,10 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
       !isAiWorking &&
       !globalAiLoading
     ) {
-      const processedHtml = injectAssetsIntoHtml(previewPageData.html);
+      const processedHtml = injectAssetsIntoHtml(
+        previewPageData.html,
+        pagesToUse
+      );
       setStableHtml(processedHtml);
     }
   }, [
@@ -245,6 +452,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
     isAiWorking,
     globalAiLoading,
     injectAssetsIntoHtml,
+    pagesToUse,
   ]);
 
   const setupIframeListeners = () => {
@@ -264,6 +472,17 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
       }
     }
   };
+
+  // Listen for navigation messages from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "navigate" && event.data?.path) {
+        setPreviewPage(event.data.path);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [setPreviewPage]);
 
   useEffect(() => {
     const cleanupListeners = () => {
@@ -479,7 +698,7 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
               normalizedHref = normalizedHref + ".html";
             }
 
-            const isPageExist = pages.some((page) => {
+            const isPageExist = pagesToUse.some((page) => {
               const pagePath = page.path.replace(/^\.?\//, "");
               return pagePath === normalizedHref;
             });
@@ -537,44 +756,34 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
         </div>
       ) : (
         <>
-          {!isNew && hasUnsavedChanges && !currentCommit && (
+          {isLoadingCommitPages && (
+            <div className="top-0 left-0 right-0 z-20 bg-blue-500/90 backdrop-blur-sm border-b border-blue-600 px-4 py-2 flex items-center justify-center gap-3 text-sm w-full">
+              <div className="flex items-center gap-2">
+                <AiLoading
+                  text="Loading commit version..."
+                  className="flex-row"
+                />
+              </div>
+            </div>
+          )}
+          {!isNew && !currentCommit && (
             <div className="top-0 left-0 right-0 z-20 bg-amber-500/90 backdrop-blur-sm border-b border-amber-600 px-4 py-2 flex items-center justify-between gap-3 text-sm w-full">
               <div className="flex items-center gap-2 flex-1">
                 <TriangleAlert className="size-4 text-amber-900 flex-shrink-0" />
                 <span className="text-amber-900 font-medium">
-                  Preview with unsaved changes. If you experience redirection
-                  errors, try refreshing the preview.
+                  Preview version of the project. Try refreshing the preview if
+                  you experience any issues.
                 </span>
               </div>
               <button
                 onClick={refreshIframe}
-                className="px-3 py-1 bg-amber-900 hover:bg-amber-800 text-amber-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
+                className="cursor-pointer text-xs px-3 py-1 bg-amber-900 hover:bg-amber-800 text-amber-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
               >
-                <RefreshCcw className="size-4 text-amber-50 flex-shrink-0" />
+                <RefreshCcw className="size-3 text-amber-50 flex-shrink-0" />
                 Refresh
               </button>
             </div>
           )}
-          {!isNew &&
-            !hasUnsavedChanges &&
-            !currentCommit &&
-            project?.private && (
-              <div className="top-0 left-0 right-0 z-20 bg-amber-500/90 backdrop-blur-sm border-b border-amber-600 px-4 py-2 flex items-center justify-between gap-3 text-sm w-full">
-                <div className="flex items-center gap-2 flex-1">
-                  <TriangleAlert className="size-4 text-amber-900 flex-shrink-0" />
-                  <span className="text-amber-900 font-medium">
-                    Private project preview. Some features may not work.
-                  </span>
-                </div>
-                <button
-                  onClick={refreshIframe}
-                  className="px-3 py-1 bg-amber-900 hover:bg-amber-800 text-amber-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
-                >
-                  <RefreshCcw className="size-4 text-amber-50 flex-shrink-0" />
-                  Refresh
-                </button>
-              </div>
-            )}
           <iframe
             key={iframeKey}
             id="preview-iframe"
@@ -587,12 +796,11 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
               }
             )}
             src={
-              currentCommit
-                ? `https://${project?.space_id?.replaceAll(
-                    "/",
-                    "-"
-                  )}--rev-${currentCommit.slice(0, 7)}.static.hf.space`
-                : !isNew && !hasUnsavedChanges && project?.space_id
+              !currentCommit &&
+              !isNew &&
+              !hasUnsavedChanges &&
+              project?.space_id &&
+              !project?.private
                 ? `https://${project.space_id.replaceAll(
                     "/",
                     "-"
@@ -600,7 +808,11 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
                 : undefined
             }
             srcDoc={
-              !currentCommit && (isNew || hasUnsavedChanges || project?.private)
+              currentCommit
+                ? commitPages.length > 0 && previewPageData?.html
+                  ? injectAssetsIntoHtml(previewPageData.html, commitPages)
+                  : defaultHTML
+                : isNew || hasUnsavedChanges || project?.private
                 ? isNew
                   ? throttledHtml || defaultHTML
                   : stableHtml
@@ -608,8 +820,10 @@ export const Preview = ({ isNew }: { isNew: boolean }) => {
             }
             onLoad={() => {
               if (
-                !currentCommit &&
-                (isNew || hasUnsavedChanges || project?.private)
+                currentCommit ||
+                isNew ||
+                hasUnsavedChanges ||
+                project?.private
               ) {
                 if (iframeRef?.current?.contentWindow?.document?.body) {
                   iframeRef.current.contentWindow.document.body.scrollIntoView({

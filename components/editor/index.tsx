@@ -155,7 +155,7 @@ export const AppEditor = ({
             }}
           />
         </div>
-        <Preview isNew={isNew} />
+        <Preview isNew={isNew} namespace={namespace} repoId={repoId} />
       </main>
 
       {/* Save Changes Popup */}
