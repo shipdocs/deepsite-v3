@@ -23,8 +23,7 @@ export const Selector = () => {
           onClick={() => {
             setIsEditableModeEnabled?.(!isEditableModeEnabled);
           }}
-          // disabled={globalAiLoading || globalEditorLoading}
-          disabled={true}
+          disabled={globalAiLoading || globalEditorLoading}
           className="!rounded-md"
         >
           <Crosshair className="size-3.5" />
@@ -35,8 +34,7 @@ export const Selector = () => {
         align="start"
         className="bg-neutral-950 text-xs text-neutral-200 py-1 px-2 rounded-md -translate-y-0.5"
       >
-        {/* Select an element on the page to ask DeepSite edit it directly. */}
-        The selector is temporarily disabled.
+        Select an element on the page to ask DeepSite edit it directly.
       </TooltipContent>
     </Tooltip>
   );
