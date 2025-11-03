@@ -22,7 +22,8 @@ const ipAddresses = new Map();
 
 export async function POST(request: NextRequest) {
   const authHeaders = await headers();
-  const userToken = request.cookies.get(MY_TOKEN_KEY())?.value;
+  const tokenInHeaders = authHeaders.get("Authorization");
+  const userToken = tokenInHeaders ? tokenInHeaders.replace("Bearer ", "") : request.cookies.get(MY_TOKEN_KEY())?.value;
 
   const body = await request.json();
   const { prompt, provider, model, redesignMarkdown, enhancedSettings, pages } = body;
