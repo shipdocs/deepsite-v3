@@ -11,6 +11,41 @@ import Logo from "@/assets/logo.svg";
 const DISCORD_PROMO_KEY = "discord-promo-dismissed";
 const DISCORD_URL = "https://discord.gg/KpanwM3vXa";
 
+const Sparkle = ({
+  size = "w-3 h-3",
+  delay = "0s",
+  top = "20%",
+  left = "20%",
+}: {
+  size?: string;
+  delay?: string;
+  top?: string;
+  left?: string;
+}) => (
+  <div
+    className={`absolute ${size}`}
+    style={{ top, left, animationDelay: delay }}
+  >
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full animate-sparkle"
+    >
+      <path
+        d="M12 0L13.5 8.5L22 10L13.5 11.5L12 20L10.5 11.5L2 10L10.5 8.5L12 0Z"
+        fill="url(#sparkle-gradient)"
+      />
+      <defs>
+        <linearGradient id="sparkle-gradient" x1="2" y1="10" x2="22" y2="10">
+          <stop offset="0%" stopColor="#818cf8" />
+          <stop offset="100%" stopColor="#a5b4fc" />
+        </linearGradient>
+      </defs>
+    </svg>
+  </div>
+);
+
 export const DiscordPromoModal = () => {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useLocalStorage<boolean>(
@@ -40,7 +75,7 @@ export const DiscordPromoModal = () => {
     setDismissed(true);
 
     const expiryDate = new Date();
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    expiryDate.setDate(expiryDate.getDate() + 5);
     document.cookie = `${DISCORD_PROMO_KEY}=true; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax`;
   };
 
@@ -52,103 +87,136 @@ export const DiscordPromoModal = () => {
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-md lg:!p-0 !rounded-3xl !bg-gradient-to-br !from-neutral-900 !via-neutral-800 !to-neutral-900 !border !border-neutral-700/50 overflow-hidden"
-        showCloseButton={false}
+        className="sm:max-w-[480px] lg:!p-0 !rounded-3xl !bg-gradient-to-b !from-indigo-950/40 !via-neutral-900 !to-neutral-900 !border !border-neutral-800 overflow-hidden"
+        showCloseButton={true}
       >
         <DialogTitle className="hidden" />
-        <main className="flex flex-col items-center text-center relative p-8">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
-            <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent pointer-events-none" />
+
+          <div className="absolute inset-x-0 top-0 h-48 overflow-hidden pointer-events-none">
+            <Sparkle size="w-2 h-2" delay="0s" top="15%" left="15%" />
+            <Sparkle size="w-3 h-3" delay="0.5s" top="25%" left="75%" />
+            <Sparkle size="w-2 h-2" delay="1s" top="35%" left="20%" />
+            <Sparkle size="w-4 h-4" delay="1.5s" top="10%" left="80%" />
+            <Sparkle size="w-2 h-2" delay="2s" top="30%" left="85%" />
           </div>
 
-          <div className="relative z-10 w-full">
-            <div className="inline-flex items-center justify-center mb-6 gap-3">
+          <div className="relative pt-12 pb-8">
+            <div className="relative z-10 flex justify-center">
               <div className="relative">
-                <div className="absolute inset-0 bg-white/10 rounded-xl blur-lg opacity-50 animate-pulse" />
-                <div className="relative bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-white/20">
-                  <Image
-                    src={Logo}
-                    alt="DeepSite"
-                    width={32}
-                    height={32}
-                    className="w-8 h-8"
-                  />
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 via-indigo-500 to-indigo-600 rounded-full blur-md opacity-50" />
+                <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 p-1 shadow-2xl">
+                  <div className="w-full h-full rounded-full bg-neutral-900 flex items-center justify-center overflow-hidden">
+                    <div className="relative w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center">
+                      <DiscordIcon className="w-12 h-12 text-white" />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="text-white/40 text-2xl font-bold animate-pulse">
-                +
-              </div>
-
-              <div className="relative">
-                <div
-                  className="absolute inset-0 bg-indigo-500/80 rounded-xl blur-lg opacity-50 animate-pulse"
-                  style={{ animationDelay: "0.5s" }}
-                />
-                <div className="relative bg-indigo-500 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-indigo-500/30">
-                  <DiscordIcon className="size-8 text-whie" />
+                <div className="absolute -bottom-2 -right-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full p-0.5 shadow-xl border-2 border-neutral-900">
+                  <div className="w-10 h-10 bg-neutral-900 rounded-full flex items-center justify-center">
+                    <Image
+                      src={Logo}
+                      alt="DeepSite"
+                      width={20}
+                      height={20}
+                      className="w-5 h-5"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <h2 className="text-3xl font-bold text-white mb-3">
-              Join Our Community! 🎉
-            </h2>
+          <main className="px-8 pb-8 pt-4">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Ready to level up your DeepSite experience?
+              </h2>
+              <p className="text-neutral-400 text-sm">
+                Join the community and unlock exclusive perks
+              </p>
+            </div>
 
-            <p className="text-neutral-300 text-base mb-6 max-w-xs mx-auto leading-relaxed">
-              Connect with other DeepSite users, get help, share your projects,
-              and stay updated with the latest features!
-            </p>
-
-            <div className="flex flex-col gap-2 mb-8 text-left">
+            <div className="flex flex-col gap-3 mb-6">
               {[
-                { emoji: "💬", text: "Chat with the community" },
-                { emoji: "🔔", text: "Get notified when new features drop" },
-                { emoji: "🎨", text: "Share your creations" },
-                { emoji: "🤝", text: "Get help from the team" },
+                "Get exclusive preview to new features",
+                "Share your projects and get feedback",
+                "Priority support from the team",
+                "Enjoy real-time updates",
               ].map((benefit, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 text-neutral-200 text-sm bg-white/5 rounded-lg px-4 py-2 backdrop-blur-sm border border-white/10"
+                  className="flex items-start gap-3 text-neutral-200"
                   style={{
-                    animation: `slideIn 0.3s ease-out ${index * 0.1}s both`,
+                    animation: `fadeIn 0.4s ease-out ${index * 0.1}s both`,
                   }}
                 >
-                  <span className="text-base">{benefit.emoji}</span>
-                  <span>{benefit.text}</span>
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center mt-0.5">
+                    <svg
+                      className="w-3 h-3 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-sm leading-6">{benefit}</span>
                 </div>
               ))}
             </div>
 
+            {/* CTA Button */}
             <div className="flex flex-col gap-3 w-full">
               <Button
                 onClick={handleJoinDiscord}
-                className="w-full !h-12 !text-base font-semibold !bg-indigo-500 hover:!bg-indigo-600 !text-white !border-0 transform hover:scale-[1.02] transition-all duration-300"
+                className="w-full !h-12 !text-base font-semibold !bg-gradient-to-r !from-indigo-500 !to-indigo-600 hover:!from-indigo-600 hover:!to-indigo-700 !text-white !border-0 transform hover:scale-[1.02] transition-all duration-200 shadow-lg shadow-indigo-500/25"
               >
-                <DiscordIcon className="size-4 mr-2" />
+                <DiscordIcon className="w-5 h-5 mr-2" />
                 Join Discord Community
               </Button>
-              <button
-                onClick={handleClose}
-                className="text-neutral-400 hover:text-neutral-300 text-sm font-medium transition-colors"
-              >
-                Maybe later
-              </button>
+
+              <p className="text-center text-xs text-neutral-500">
+                Free to join. Connect instantly.
+              </p>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
 
         <style jsx>{`
-          @keyframes slideIn {
+          @keyframes fadeIn {
             from {
               opacity: 0;
-              transform: translateX(-10px);
+              transform: translateY(5px);
             }
             to {
               opacity: 1;
-              transform: translateX(0);
+              transform: translateY(0);
             }
+          }
+
+          @keyframes sparkle {
+            0%,
+            100% {
+              opacity: 0;
+              transform: scale(0) rotate(0deg);
+            }
+            50% {
+              opacity: 1;
+              transform: scale(1) rotate(180deg);
+            }
+          }
+
+          :global(.animate-sparkle) {
+            animation: sparkle 2s ease-in-out infinite;
           }
         `}</style>
       </DialogContent>
