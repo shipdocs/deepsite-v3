@@ -15,6 +15,7 @@ import { FileBrowser } from "./file-browser";
 import { AskAi } from "./ask-ai";
 import { Preview } from "./preview";
 import { SaveChangesPopup } from "./save-changes-popup";
+import { DiscordPromoModal } from "@/components/discord-promo-modal";
 import Loading from "../loading";
 import { Page } from "@/types";
 
@@ -158,7 +159,6 @@ export const AppEditor = ({
         <Preview isNew={isNew} namespace={namespace} repoId={repoId} />
       </main>
 
-      {/* Save Changes Popup */}
       <SaveChangesPopup
         isOpen={showSavePopup}
         onClose={() => setShowSavePopup(false)}
@@ -167,6 +167,8 @@ export const AppEditor = ({
         pages={pages}
         project={project}
       />
+
+      <DiscordPromoModal />
     </section>
   );
 };
