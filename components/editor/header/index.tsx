@@ -23,7 +23,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import DiscordLogo from "@/assets/discord.svg";
 import { DiscordIcon } from "@/components/icons/discord";
 
 export function Header({ isNew }: { isNew: boolean }) {
@@ -89,7 +88,11 @@ export function Header({ isNew }: { isNew: boolean }) {
               Help
             </Button>
           </Link>
-          <Link href="https://discord.gg/KpanwM3vXa" target="_blank">
+          <Link
+            href="https://discord.gg/KpanwM3vXa"
+            target="_blank"
+            className="max-lg:hidden"
+          >
             <Button
               size="xs"
               variant="bordered"

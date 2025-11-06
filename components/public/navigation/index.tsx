@@ -12,6 +12,7 @@ import Logo from "@/assets/logo.svg";
 import { useUser } from "@/hooks/useUser";
 import { UserMenu } from "@/components/user-menu";
 import { ProTag } from "@/components/pro-modal";
+import { DiscordIcon } from "@/components/icons/discord";
 
 const navigationLinks = [
   {
@@ -96,7 +97,9 @@ export default function Navigation() {
             width={64}
             height={64}
           />
-          <p className="font-sans text-white text-xl font-bold">DeepSite</p>
+          <p className="font-sans text-white text-xl font-bold max-lg:hidden">
+            DeepSite
+          </p>
           {user?.isPro && <ProTag className="ml-1" />}
         </Link>
         <ul className="items-center justify-center gap-6 !hidden">
@@ -141,7 +144,17 @@ export default function Navigation() {
             <div className="size-1 bg-white rounded-full" />
           </div>
         </ul>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-3">
+          <Link href="https://discord.gg/KpanwM3vXa" target="_blank">
+            <Button
+              variant="bordered"
+              className="!border-indigo-500 !text-white !bg-indigo-500 shadow-lg shadow-indigo-500/50 hover:shadow-indigo-500/70 transition-all duration-300"
+            >
+              <DiscordIcon className="size-4 mr-0.5" />
+              <span className="max-lg:hidden">Discord Community</span>
+              <span className="lg:hidden">Discord</span>
+            </Button>
+          </Link>
           {loading ? (
             <Button
               variant="ghostDarker"
