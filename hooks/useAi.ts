@@ -44,6 +44,18 @@ export const useAi = (onScrollToBottom?: () => void) => {
     client.setQueryData(["ai.isThinking"], newIsThinking);
   };
 
+  const { data: thinkingContent } = useQuery<string>({
+    queryKey: ["ai.thinkingContent"],
+    queryFn: async () => "",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    initialData: ""
+  });
+  const setThinkingContent = (newThinkingContent: string) => {
+    client.setQueryData(["ai.thinkingContent"], newThinkingContent);
+  };
+
   const { data: selectedElement } = useQuery<HTMLElement | null>({
     queryKey: ["ai.selectedElement"],
     queryFn: async () => null,
@@ -167,6 +179,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
     if (!redesignMarkdown && !prompt.trim()) return;
     
     setIsAiWorking(true);
+    setThinkingContent(""); // Reset thinking content
     streamingPagesRef.current.clear(); // Reset tracking for new generation
     
     const abortController = new AbortController();
@@ -199,6 +212,14 @@ export const useAi = (onScrollToBottom?: () => void) => {
           const { done, value } = await reader.read();
           
           if (done) {
+            // Final processing - extract and remove thinking content
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*?)<\/think>/);
+            if (thinkMatch) {
+              setThinkingContent(thinkMatch[1].trim());
+              setIsThinking(false);
+              contentResponse = contentResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+            }
+
             const trimmedResponse = contentResponse.trim();
             if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
               try {
@@ -238,6 +259,26 @@ export const useAi = (onScrollToBottom?: () => void) => {
           const chunk = decoder.decode(value, { stream: true });
           contentResponse += chunk;
           
+          // Extract thinking content while streaming
+          if (contentResponse.includes('</think>')) {
+            // Thinking is complete, extract final content and stop thinking
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*?)<\/think>/);
+            if (thinkMatch) {
+              setThinkingContent(thinkMatch[1].trim());
+              setIsThinking(false);
+            }
+          } else if (contentResponse.includes('<think>')) {
+            // Still thinking, update content
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*)$/);
+            if (thinkMatch) {
+              const thinkingText = thinkMatch[1].trim();
+              if (thinkingText) {
+                setIsThinking(true);
+                setThinkingContent(thinkingText);
+              }
+            }
+          }
+
           const trimmedResponse = contentResponse.trim();
           if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
             try {
@@ -270,6 +311,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
     } catch (error: any) {
       setIsAiWorking(false);
       setIsThinking(false);
+      setThinkingContent("");
       setController(null);
       
       if (!abortController.signal.aborted) {
@@ -289,6 +331,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
 
     
     setIsAiWorking(true);
+    setThinkingContent(""); // Reset thinking content
     
     const abortController = new AbortController();
     setController(abortController);
@@ -330,6 +373,14 @@ export const useAi = (onScrollToBottom?: () => void) => {
           const { done, value } = await reader.read();
           
           if (done) {
+            // Extract and remove thinking content
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*?)<\/think>/);
+            if (thinkMatch) {
+              setThinkingContent(thinkMatch[1].trim());
+              setIsThinking(false);
+              contentResponse = contentResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+            }
+
             const metadataMatch = contentResponse.match(/___METADATA_START___([\s\S]*?)___METADATA_END___/);
             if (metadataMatch) {
               try {
@@ -439,6 +490,26 @@ export const useAi = (onScrollToBottom?: () => void) => {
           const chunk = decoder.decode(value, { stream: true });
           contentResponse += chunk;
           
+          // Extract thinking content while streaming
+          if (contentResponse.includes('</think>')) {
+            // Thinking is complete, extract final content and stop thinking
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*?)<\/think>/);
+            if (thinkMatch) {
+              setThinkingContent(thinkMatch[1].trim());
+              setIsThinking(false);
+            }
+          } else if (contentResponse.includes('<think>')) {
+            // Still thinking, update content
+            const thinkMatch = contentResponse.match(/<think>([\s\S]*)$/);
+            if (thinkMatch) {
+              const thinkingText = thinkMatch[1].trim();
+              if (thinkingText) {
+                setIsThinking(true);
+                setThinkingContent(thinkingText);
+              }
+            }
+          }
+
           // Check for error responses during streaming
           const trimmedResponse = contentResponse.trim();
           if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
@@ -471,6 +542,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
     } catch (error: any) {
       setIsAiWorking(false);
       setIsThinking(false);
+      setThinkingContent("");
       setController(null);
       
       if (!abortController.signal.aborted) {
@@ -618,6 +690,8 @@ export const useAi = (onScrollToBottom?: () => void) => {
   return {
     isThinking,
     setIsThinking,
+    thinkingContent,
+    setThinkingContent,
     callAiNewProject,
     callAiFollowUp,
     isAiWorking,

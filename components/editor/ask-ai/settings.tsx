@@ -20,7 +20,14 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { useUpdateEffect } from "react-use";
 import Image from "next/image";
-import { BrainIcon, CheckCheck, ChevronDown } from "lucide-react";
+import {
+  BrainIcon,
+  CheckCheck,
+  ChevronDown,
+  Sparkles,
+  Zap,
+  DollarSign,
+} from "lucide-react";
 import { useAi } from "@/hooks/useAi";
 import { getProviders } from "@/lib/get-providers";
 import Loading from "@/components/loading";
@@ -62,7 +69,10 @@ export function Settings({
   // }, [model]);
 
   useUpdateEffect(() => {
-    if (provider !== "auto" && !providers.includes(provider as string)) {
+    if (
+      !["auto", "fastest", "cheapest"].includes(provider as string) &&
+      !providers.includes(provider as string)
+    ) {
       setProvider("auto");
     }
   }, [model, provider]);
@@ -205,47 +215,83 @@ export function Settings({
             </div>
           )} */}
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-neutral-300 text-sm mb-1.5">
-                  Use auto-provider
-                </p>
-                <p className="text-xs text-neutral-400/70">
-                  We&apos;ll automatically select the best provider for you
-                  based on your prompt.
-                </p>
-              </div>
-              <div
-                className={classNames(
-                  "bg-neutral-700 rounded-full min-w-10 w-10 h-6 flex items-center justify-between p-1 cursor-pointer transition-all duration-200",
-                  {
-                    "!bg-sky-500": provider === "auto",
-                  }
-                )}
-                onClick={() => {
-                  const foundModel = MODELS.find(
-                    (m: { value: string }) => m.value === model
-                  );
-                  if (provider === "auto" && foundModel?.autoProvider) {
-                    setProvider(foundModel.autoProvider);
-                  } else {
-                    setProvider("auto");
-                  }
-                }}
-              >
-                <div
+            <div>
+              <p className="text-neutral-300 text-sm mb-1">Provider Mode</p>
+              <p className="text-neutral-400 text-xs mb-3 leading-relaxed">
+                Choose how we select providers:{" "}
+                <span className="text-white px-1.5 py-0.5 rounded bg-pink-500">
+                  Auto
+                </span>{" "}
+                (smart),{" "}
+                <span className="text-white px-1.5 py-0.5 rounded bg-yellow-500">
+                  Fastest
+                </span>{" "}
+                (speed), or{" "}
+                <span className="text-white px-1.5 py-0.5 rounded bg-green-500">
+                  Cheapest
+                </span>{" "}
+                (cost).
+              </p>
+              <div className="grid grid-cols-3 gap-1 bg-neutral-800 p-1 rounded-full">
+                <button
                   className={classNames(
-                    "w-4 h-4 rounded-full shadow-md transition-all duration-200 bg-neutral-200",
+                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
                     {
-                      "translate-x-4": provider === "auto",
+                      "bg-white text-neutral-800": provider === "auto",
+                      "text-neutral-400 hover:text-neutral-200":
+                        provider !== "auto",
                     }
                   )}
-                />
+                  onClick={() => setProvider("auto")}
+                >
+                  <Sparkles
+                    className={classNames("size-3.5 mb-0.5", {
+                      "text-pink-400": provider !== "auto",
+                    })}
+                  />
+                  <span className="text-[10px] font-medium">Auto</span>
+                </button>
+                <button
+                  className={classNames(
+                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
+                    {
+                      "bg-white text-neutral-800": provider === "fastest",
+                      "text-neutral-400 hover:text-neutral-200":
+                        provider !== "fastest",
+                    }
+                  )}
+                  onClick={() => setProvider("fastest")}
+                >
+                  <Zap
+                    className={classNames("size-3.5 mb-0.5", {
+                      "text-yellow-400": provider !== "fastest",
+                    })}
+                  />
+                  <span className="text-[10px] font-medium">Fastest</span>
+                </button>
+                <button
+                  className={classNames(
+                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
+                    {
+                      "bg-white text-neutral-800": provider === "cheapest",
+                      "text-neutral-400 hover:text-neutral-200":
+                        provider !== "cheapest",
+                    }
+                  )}
+                  onClick={() => setProvider("cheapest")}
+                >
+                  <DollarSign
+                    className={classNames("size-3.5 mb-0.5", {
+                      "text-green-400": provider !== "cheapest",
+                    })}
+                  />
+                  <span className="text-[10px] font-medium">Cheapest</span>
+                </button>
               </div>
             </div>
             <label className="block">
               <p className="text-neutral-300 text-sm mb-2">
-                Inference Provider
+                Or choose a specific provider
               </p>
               <div className="grid grid-cols-2 gap-1.5 relative">
                 {loadingProviders ? (

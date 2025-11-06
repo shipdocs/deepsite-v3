@@ -16,7 +16,7 @@ Examples: http://static.photos/red/320x240/133 (red-themed with seed 133), http:
 export const PROMPT_FOR_PROJECT_NAME = `REQUIRED: Generate a name for the project, based on the user's request. Try to be creative and unique. Add a emoji at the end of the name. It should be short, like 6 words. Be fancy, creative and funny. DON'T FORGET IT, IT'S IMPORTANT!`
 
 export const INITIAL_SYSTEM_PROMPT_LIGHT = `You are an expert UI/UX and Front-End Developer.
-No need to explain what you did. Just return the expected result.
+No need to explain what you did. Just return the expected result. Use always TailwindCSS, don't forget to import it.
 Return the results following this format:
 1. Start with ${PROJECT_NAME_START}.
 2. Add the name of the project, right after the start tag.

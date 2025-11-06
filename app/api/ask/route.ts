@@ -80,8 +80,6 @@ export async function POST(request: NextRequest) {
     billTo = "huggingface";
   }
 
-  const selectedProvider = await getBestProvider(selectedModel.value, provider)
-
   let rewrittenPrompt = redesignMarkdown ? `Here is my current design as a markdown:\n\n${redesignMarkdown}\n\nNow, please create a new design based on this markdown. Use the images in the markdown.` : prompt;
 
   if (enhancedSettings.isActive) {
@@ -114,8 +112,7 @@ export async function POST(request: NextRequest) {
         
         const chatCompletion = client.chatCompletionStream(
           {
-            model: selectedModel.value,
-            provider: selectedProvider,
+            model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
             messages: [
               {
                 role: "system",
@@ -142,7 +139,6 @@ export async function POST(request: NextRequest) {
           }
 
           const chunk = value.choices[0]?.delta?.content;
-          console.log(chunk);
           if (chunk) {
             await writer.write(encoder.encode(chunk));
           }
@@ -267,8 +263,6 @@ export async function PUT(request: NextRequest) {
     billTo = "huggingface";
   }
 
-  const selectedProvider = await getBestProvider(selectedModel.value, provider);
-
   try {
     const encoder = new TextEncoder();
     const stream = new TransformStream();
@@ -304,8 +298,7 @@ export async function PUT(request: NextRequest) {
 
         const chatCompletion = client.chatCompletionStream(
           {
-            model: selectedModel.value,
-            provider: selectedProvider,
+            model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
             messages: [
               {
                 role: "system",

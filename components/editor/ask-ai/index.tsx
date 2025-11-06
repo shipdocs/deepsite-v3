@@ -38,6 +38,7 @@ export const AskAi = ({
   const {
     isAiWorking,
     isThinking,
+    thinkingContent,
     selectedFiles,
     setSelectedFiles,
     selectedElement,
@@ -66,7 +67,6 @@ export const AskAi = ({
   const [prompt, setPrompt] = useState(
     promptStorage && promptStorage.trim() !== "" ? promptStorage : ""
   );
-  const [think, setThink] = useState("");
   const [openThink, setOpenThink] = useState(false);
   const [randomPromptLoading, setRandomPromptLoading] = useState(false);
 
@@ -142,7 +142,15 @@ export const AskAi = ({
     if (refThink.current) {
       refThink.current.scrollTop = refThink.current.scrollHeight;
     }
-  }, [think]);
+    // Auto-open dropdown when thinking content appears
+    if (thinkingContent && isThinking && !openThink) {
+      setOpenThink(true);
+    }
+    // Auto-collapse when thinking is complete
+    if (thinkingContent && !isThinking && openThink) {
+      setOpenThink(false);
+    }
+  }, [thinkingContent, isThinking]);
 
   const randomPrompt = () => {
     setRandomPromptLoading(true);
@@ -157,7 +165,7 @@ export const AskAi = ({
   return (
     <div className="p-3 w-full">
       <div className="relative bg-neutral-800 border border-neutral-700 rounded-2xl ring-[4px] focus-within:ring-neutral-500/30 focus-within:border-neutral-600 ring-transparent z-20 w-full group">
-        {think && (
+        {thinkingContent && (
           <div className="w-full border-b border-neutral-700 relative overflow-hidden">
             <header
               className="flex items-center justify-between px-5 py-2.5 group hover:bg-neutral-600/20 transition-colors duration-200 cursor-pointer"
@@ -189,7 +197,7 @@ export const AskAi = ({
               )}
             >
               <p className="text-[13px] text-neutral-400 whitespace-pre-line px-5 pb-4 pt-3">
-                {think}
+                {thinkingContent}
               </p>
             </main>
           </div>
@@ -221,7 +229,7 @@ export const AskAi = ({
                     ? "Uploading images..."
                     : isAiWorking && !isSameHtml
                     ? "DeepSite is working..."
-                    : "DeepSite is thinking..."
+                    : "DeepSite is working..."
                 }
               />
               {isAiWorking && (
