@@ -136,7 +136,7 @@ export const DiscordPromoModal = () => {
                 Ready to level up your DeepSite experience?
               </h2>
               <p className="text-neutral-400 text-sm">
-                Join the community and unlock exclusive perks
+                Get help, share your projects and ask for suggestions!
               </p>
             </div>
 
