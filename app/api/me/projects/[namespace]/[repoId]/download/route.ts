@@ -49,21 +49,18 @@ export async function GET(
       name: `${namespace}/${repoId}`,
     };
 
-    // Create a new JSZip instance
     const zip = new JSZip();
 
-    // Iterate through all files in the repo
     for await (const fileInfo of listFiles({ 
       repo, 
-      accessToken: user.token as string 
+      accessToken: user.token as string, 
+      recursive: true,
     })) {
-      // Skip directories and hidden files
       if (fileInfo.type === "directory" || fileInfo.path.startsWith(".")) {
         continue;
       }
 
       try {
-        // Download the file
         const blob = await downloadFile({ 
           repo, 
           accessToken: user.token as string, 
@@ -72,17 +69,14 @@ export async function GET(
         });
 
         if (blob) {
-          // Add file to zip
           const arrayBuffer = await blob.arrayBuffer();
           zip.file(fileInfo.path, arrayBuffer);
         }
       } catch (error) {
         console.error(`Error downloading file ${fileInfo.path}:`, error);
-        // Continue with other files even if one fails
       }
     }
 
-    // Generate the ZIP file as a Blob
     const zipBlob = await zip.generateAsync({ 
       type: "blob",
       compression: "DEFLATE",
@@ -91,11 +85,9 @@ export async function GET(
       }
     });
 
-    // Create the filename from the project name
     const projectName = `${namespace}-${repoId}`.replace(/[^a-zA-Z0-9-_]/g, '_');
     const filename = `${projectName}.zip`;
 
-    // Return the ZIP file
     return new NextResponse(zipBlob, {
       headers: {
         "Content-Type": "application/zip",
@@ -104,7 +96,6 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error("Error creating ZIP:", error);
     return NextResponse.json(
       { ok: false, error: error.message || "Failed to create ZIP file" },
       { status: 500 }

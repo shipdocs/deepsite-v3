@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectType } from "@/types";
+import { toast } from "sonner";
 
 // from-red-500 to-red-500
 // from-yellow-500 to-yellow-500
@@ -44,8 +45,49 @@ export function ProjectCard({
     }
   };
 
-  const handleDownload = () => {
-    window.open(`/deepsite/api/me/projects/${project.name}/download`, "_blank");
+  const handleDownload = async () => {
+    try {
+      toast.info("Preparing download...");
+
+      // Fetch with credentials to ensure cookies are sent
+      const response = await fetch(
+        `/deepsite/api/me/projects/${project.name}/download`,
+        {
+          credentials: "include",
+          headers: {
+            Accept: "application/zip",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: "Download failed" }));
+        toast.error(error.error || "Failed to download project");
+        return;
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${project.name.replace(/\//g, "-")}.zip`;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Download started!");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download project");
+    }
   };
   // from-gray-600 to-gray-600
   // from-blue-600 to-blue-600
