@@ -767,19 +767,19 @@ export const Preview = ({
             </div>
           )}
           {!isNew && !currentCommit && (
-            <div className="top-0 left-0 right-0 z-20 bg-amber-500/90 backdrop-blur-sm border-b border-amber-600 px-4 py-2 flex items-center justify-between gap-3 text-sm w-full">
+            <div className="top-0 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-800 px-4 py-2 max-h-[40px] flex items-center justify-between gap-3 text-xs w-full">
               <div className="flex items-center gap-2 flex-1">
-                <TriangleAlert className="size-4 text-amber-900 flex-shrink-0" />
-                <span className="text-amber-900 font-medium">
+                <TriangleAlert className="size-4 text-neutral-500 flex-shrink-0" />
+                <span className="text-neutral-400 font-medium">
                   Preview version of the project. Try refreshing the preview if
                   you experience any issues.
                 </span>
               </div>
               <button
                 onClick={refreshIframe}
-                className="cursor-pointer text-xs px-3 py-1 bg-amber-900 hover:bg-amber-800 text-amber-50 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
+                className="cursor-pointer text-xs px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-md font-medium transition-colors whitespace-nowrap flex items-center gap-1.5"
               >
-                <RefreshCcw className="size-3 text-amber-50 flex-shrink-0" />
+                <RefreshCcw className="size-3 text-neutral-300 flex-shrink-0" />
                 Refresh
               </button>
             </div>

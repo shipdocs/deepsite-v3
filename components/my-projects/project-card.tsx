@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { formatDistance } from "date-fns";
-import { EllipsisVertical, Lock, Settings, Trash } from "lucide-react";
+import {
+  Download,
+  EllipsisVertical,
+  Lock,
+  Settings,
+  Trash,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +42,10 @@ export function ProjectCard({
     ) {
       onDelete();
     }
+  };
+
+  const handleDownload = () => {
+    window.open(`/deepsite/api/me/projects/${project.name}/download`, "_blank");
   };
   // from-gray-600 to-gray-600
   // from-blue-600 to-blue-600
@@ -120,6 +130,10 @@ export function ProjectCard({
                   Project Settings
                 </DropdownMenuItem>
               </a>
+              <DropdownMenuItem onClick={handleDownload}>
+                <Download className="size-4 text-neutral-100" />
+                Download as ZIP
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={handleDelete}>
                 <Trash className="size-4 text-red-500" />
                 Delete Project
