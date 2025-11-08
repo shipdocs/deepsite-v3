@@ -22,6 +22,7 @@ import { Settings } from "./settings";
 import { useProModal } from "@/components/contexts/pro-context";
 import { MAX_FREE_PROJECTS } from "@/lib/utils";
 import { PROMPTS_FOR_AI } from "@/lib/prompts";
+import { SelectedRedesignUrl } from "./selected-redesign-url";
 
 export const AskAi = ({
   project,
@@ -52,6 +53,9 @@ export const AskAi = ({
   const { openProModal } = useProModal();
   const [openProvider, setOpenProvider] = useState(false);
   const [providerError, setProviderError] = useState("");
+  const [redesignData, setRedesignData] = useState<
+    undefined | { markdown: string; url: string }
+  >(undefined);
   const refThink = useRef<HTMLDivElement>(null);
 
   const [enhancedSettings, setEnhancedSettings, removeEnhancedSettings] =
@@ -76,7 +80,7 @@ export const AskAi = ({
     }
   });
 
-  const callAi = async (redesignMarkdown?: string) => {
+  const callAi = async (redesignMarkdown?: string | undefined) => {
     removePromptStorage();
     if (user && !user.isPro && projects.length >= MAX_FREE_PROJECTS)
       return openProModal([]);
@@ -218,6 +222,15 @@ export const AskAi = ({
             />
           </div>
         )}
+        {redesignData && (
+          <div className="px-4 pt-3">
+            <SelectedRedesignUrl
+              url={redesignData.url}
+              isAiWorking={isAiWorking}
+              onDelete={() => setRedesignData(undefined)}
+            />
+          </div>
+        )}
         <div className="w-full relative flex items-center justify-between">
           {(isAiWorking || isUploading || isThinking || isLoadingProject) && (
             <div className="absolute bg-neutral-800 top-0 left-4 w-[calc(100%-30px)] h-full z-1 flex items-start pt-3.5 justify-between max-lg:text-sm">
@@ -259,6 +272,8 @@ export const AskAi = ({
             placeholder={
               selectedElement
                 ? `Ask DeepSite about ${selectedElement.tagName.toLowerCase()}...`
+                : redesignData
+                ? "Ask DeepSite anything about the redesign of your site..."
                 : isFollowUp && (!isSameHtml || pages?.length > 1)
                 ? "Ask DeepSite for edits"
                 : "Ask DeepSite anything..."
@@ -303,7 +318,13 @@ export const AskAi = ({
               onClose={setOpenProvider}
             />
             {!isNew && <Uploader project={project} />}
-            {isNew && <ReImagine onRedesign={(md) => callAi(md)} />}
+            {isNew && (
+              <ReImagine
+                onRedesign={(md, url) =>
+                  setRedesignData({ markdown: md, url: url })
+                }
+              />
+            )}
             {!isNew && !isSameHtml && <Selector />}
           </div>
           <div className="flex items-center justify-end gap-2">
@@ -312,9 +333,11 @@ export const AskAi = ({
               variant="outline"
               className="!rounded-md"
               disabled={
-                isAiWorking || isUploading || isThinking || !prompt.trim()
+                !!redesignData?.url?.trim()
+                  ? false
+                  : isAiWorking || isUploading || isThinking || !prompt.trim()
               }
-              onClick={() => callAi()}
+              onClick={() => callAi(redesignData?.markdown)}
             >
               <ArrowUp className="size-4" />
             </Button>

@@ -13,11 +13,12 @@ import Loading from "@/components/loading";
 import { api } from "@/lib/api";
 import { useAi } from "@/hooks/useAi";
 import { useEditor } from "@/hooks/useEditor";
+import classNames from "classnames";
 
 export function ReImagine({
   onRedesign,
 }: {
-  onRedesign: (md: string) => void;
+  onRedesign: (md: string, url: string) => void;
 }) {
   const [url, setUrl] = useState<string>("");
   const [open, setOpen] = useState(false);
@@ -49,8 +50,8 @@ export function ReImagine({
     });
     if (response?.data?.ok) {
       setOpen(false);
+      onRedesign(response.data.markdown, url.trim());
       setUrl("");
-      onRedesign(response.data.markdown);
       toast.success("DeepSite is redesigning your site! Let him cook... 🔥");
     } else {
       toast.error(response?.data?.error || "Failed to redesign the site.");
@@ -116,6 +117,11 @@ export function ReImagine({
                     return;
                   }
                   setUrl(inputUrl);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleClick();
+                  }
                 }}
                 className="!bg-white !border-neutral-300 !text-neutral-800 !placeholder:text-neutral-400 selection:!bg-blue-100"
               />

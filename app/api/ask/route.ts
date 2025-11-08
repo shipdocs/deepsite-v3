@@ -80,12 +80,6 @@ export async function POST(request: NextRequest) {
     billTo = "huggingface";
   }
 
-  let rewrittenPrompt = redesignMarkdown ? `Here is my current design as a markdown:\n\n${redesignMarkdown}\n\nNow, please create a new design based on this markdown. Use the images in the markdown.` : prompt;
-
-  if (enhancedSettings.isActive) {
-    // rewrittenPrompt = await rewritePrompt(rewrittenPrompt, enhancedSettings, { token, billTo }, selectedModel.value, selectedProvider.provider);
-  }
-
   try {
     const encoder = new TextEncoder();
     const stream = new TransformStream();
@@ -107,8 +101,8 @@ export async function POST(request: NextRequest) {
           ? INITIAL_SYSTEM_PROMPT_LIGHT 
           : INITIAL_SYSTEM_PROMPT;
         
-        const userPrompt = rewrittenPrompt;
-        
+        const userPrompt = prompt;
+                
         const chatCompletion = client.chatCompletionStream(
           {
             model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
@@ -117,6 +111,10 @@ export async function POST(request: NextRequest) {
                 role: "system",
                 content: systemPrompt,
               },
+              ...(redesignMarkdown ? [{
+                role: "assistant",
+                content: `User will ask you to redesign the site based on this markdown. Use the same images as the site, but you can improve the content and the design. Here is the markdown: ${redesignMarkdown}`
+              }] : []),
               {
                 role: "user",
                 content: userPrompt + (enhancedSettings.isActive ? `1. I want to use the following primary color: ${enhancedSettings.primaryColor} (eg: bg-${enhancedSettings.primaryColor}-500).
