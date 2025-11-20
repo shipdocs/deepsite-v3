@@ -96,14 +96,14 @@ export const MODELS = [
   //   logo: KimiLogo,
   //   companyName: "Kimi",
   // },
-  {
-    value: "moonshotai/Kimi-K2-Thinking",
-    label: "Kimi K2 Thinking",
-    logo: KimiLogo,
-    companyName: "Kimi",
-    isNew: true,
-    temperature: 1.0,
-  },
+  // {
+  //   value: "moonshotai/Kimi-K2-Thinking",
+  //   label: "Kimi K2 Thinking",
+  //   logo: KimiLogo,
+  //   companyName: "Kimi",
+  //   isNew: true,
+  //   temperature: 1.0,
+  // },
   {
     value: "zai-org/GLM-4.6",
     label: "GLM-4.6",

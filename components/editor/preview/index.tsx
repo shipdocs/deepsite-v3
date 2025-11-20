@@ -797,10 +797,10 @@ export const Preview = ({
             )}
             src={
               currentCommit && project?.space_id && !project?.private
-                ? `https://${project.space_id.replaceAll(
+                ? `https://${project?.space_id?.replaceAll(
                     "/",
                     "-"
-                  )}.static.hf.space`
+                  )}--rev-${currentCommit.slice(0, 7)}.static.hf.space`
                 : undefined
             }
             srcDoc={

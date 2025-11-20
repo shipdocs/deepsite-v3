@@ -7,7 +7,7 @@ import { MODELS } from "@/lib/providers";
 import { useEditor } from "./useEditor";
 import { Page, EnhancedSettings } from "@/types";
 import { api } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "./useUser";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
 
@@ -20,6 +20,9 @@ export const useAi = (onScrollToBottom?: () => void) => {
   const [storageModel, setStorageModel] = useLocalStorage("model", MODELS[0].value);
   const router = useRouter();
   const { token } = useUser();
+  const pathname = usePathname();
+  const namespace = pathname.split("/")[1];
+  const repoId = pathname.split("/")[2];
   const streamingPagesRef = useRef<Set<string>>(new Set());
 
   const { data: isAiWorking = false } = useQuery({
@@ -382,15 +385,15 @@ export const useAi = (onScrollToBottom?: () => void) => {
               contentResponse = contentResponse.replace(/<think>[\s\S]*?<\/think>/, '').trim();
             }
 
-            const metadataMatch = contentResponse.match(/___METADATA_START___([\s\S]*?)___METADATA_END___/);
-            if (metadataMatch) {
-              try {
-                metadata = JSON.parse(metadataMatch[1]);
-                contentResponse = contentResponse.replace(/___METADATA_START___[\s\S]*?___METADATA_END___/, '').trim();
-              } catch (e) {
-                console.error("Failed to parse metadata", e);
-              }
-            }
+            // const metadataMatch = contentResponse.match(/___METADATA_START___([\s\S]*?)___METADATA_END___/);
+            // if (metadataMatch) {
+            //   try {
+            //     metadata = JSON.parse(metadataMatch[1]);
+            //     contentResponse = contentResponse.replace(/___METADATA_START___[\s\S]*?___METADATA_END___/, '').trim();
+            //   } catch (e) {
+            //     console.error("Failed to parse metadata", e);
+            //   }
+            // }
 
             const trimmedResponse = contentResponse.trim();
             if (trimmedResponse.startsWith("{") && trimmedResponse.endsWith("}")) {
@@ -436,7 +439,7 @@ export const useAi = (onScrollToBottom?: () => void) => {
             }
 
             try {
-              const uploadRequest = await fetch(`/deepsite/api/me/projects/${metadata?.userName || 'unknown'}/${isNew ? 'new' : (project?.space_id?.split('/')[1] || 'unknown')}/update`, {
+              const uploadRequest = await fetch(`/deepsite/api/me/projects/${namespace ?? 'unknown'}/${repoId ?? 'unknown'}/update`, {
                 method: "PUT",
                 body: JSON.stringify({
                   pages: mergedPages,

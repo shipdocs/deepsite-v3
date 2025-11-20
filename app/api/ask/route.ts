@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
             ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
             ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
             ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
+            max_tokens: 32000,
           },
           billTo ? { billTo } : {}
         );
@@ -281,7 +282,7 @@ export async function PUT(request: NextRequest) {
           ? FOLLOW_UP_SYSTEM_PROMPT_LIGHT 
           : FOLLOW_UP_SYSTEM_PROMPT;
         const systemPrompt = basePrompt + (isNew ? PROMPT_FOR_PROJECT_NAME : "");
-        const userContext = "You are modifying the HTML file based on the user's request.";
+        // const userContext = "You are modifying the HTML file based on the user's request.";
 
         const allPages = pages || [];
         const pagesContext = allPages
@@ -299,15 +300,7 @@ export async function PUT(request: NextRequest) {
             messages: [
               {
                 role: "system",
-                content: systemPrompt,
-              },
-              {
-                role: "user",
-                content: userContext,
-              },
-              {
-                role: "assistant",
-                content: assistantContext,
+                content: systemPrompt + assistantContext
               },
               {
                 role: "user",
@@ -317,6 +310,7 @@ export async function PUT(request: NextRequest) {
             ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
             ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
             ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
+            max_tokens: 32000,
           },
           billTo ? { billTo } : {}
         );
