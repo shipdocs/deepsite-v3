@@ -562,16 +562,16 @@ export const useAi = (onScrollToBottom?: () => void) => {
 
   const formatPages = (content: string, isStreaming: boolean = true) => {
     const pages: Page[] = [];
-    if (!content.match(/<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/)) {
+    if (!content.match(/<<<<<<< NEW_FILE_START[\s\S]*?>>>>>>> NEW_FILE_END/)) {
       return pages;
     }
 
     const cleanedContent = content.replace(
-      /[\s\S]*?<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/,
+      /[\s\S]*?<<<<<<< NEW_FILE_START\s+([\s\S]*?)\s+>>>>>>> NEW_FILE_END/,
       "<<<<<<< NEW_FILE_START $1 >>>>>>> NEW_FILE_END"
     );
     const fileChunks = cleanedContent.split(
-      /<<<<<<< NEW_FILE_START (.*?) >>>>>>> NEW_FILE_END/
+      /<<<<<<< NEW_FILE_START\s+([\s\S]*?)\s+>>>>>>> NEW_FILE_END/
     );
     const processedChunks = new Set<number>();
 

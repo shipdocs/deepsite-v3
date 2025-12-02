@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
         
         await writer.close();
       } catch (error: any) {
+        console.error(error);
         if (error.message?.includes("exceeded your monthly included credits")) {
           await writer.write(
             encoder.encode(

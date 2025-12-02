@@ -1,0 +1,34 @@
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const targetOrigins = [
+      "https://huggingface.co/deepsite",
+      "https://enzostvs-deepsite.hf.space",
+    ];
+    document.querySelectorAll("*").forEach((element) => {
+      element.addEventListener("click", () => {
+        targetOrigins.forEach((targetOrigin) => {
+          window.postMessage(
+            { type: "ELEMENT_CLICKED", element },
+            targetOrigin
+          );
+        });
+      });
+      element.addEventListener("mouseover", () => {
+        targetOrigins.forEach((targetOrigin) => {
+          window.postMessage(
+            { type: "ELEMENT_HOVERED_OVER", element },
+            targetOrigin
+          );
+        });
+      });
+      element.addEventListener("mouseout", () => {
+        targetOrigins.forEach((targetOrigin) => {
+          window.postMessage(
+            { type: "ELEMENT_HOVERED_OUT", element },
+            targetOrigin
+          );
+        });
+      });
+    });
+  });
+</script>

@@ -47,13 +47,14 @@ export const processAiResponse = (
 
   // Process UPDATE_FILE blocks
   const updateFileRegex = new RegExp(
-    `${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${UPDATE_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`,
+    `${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)${UPDATE_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`,
     'g'
   );
   let updateFileMatch;
 
   while ((updateFileMatch = updateFileRegex.exec(chunk)) !== null) {
-    const [, filePath, fileContent] = updateFileMatch;
+    const [, filePathRaw, fileContent] = updateFileMatch;
+    const filePath = filePathRaw.trim();
 
     const pageIndex = updatedPages.findIndex(p => p.path === filePath);
     if (pageIndex !== -1) {
@@ -123,13 +124,14 @@ export const processAiResponse = (
 
   // Process NEW_FILE blocks
   const newFileRegex = new RegExp(
-    `${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\s]+)\\s*${NEW_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`,
+    `${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)${NEW_FILE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s\\S]*?)(?=${UPDATE_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${NEW_FILE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|$)`,
     'g'
   );
   let newFileMatch;
 
   while ((newFileMatch = newFileRegex.exec(chunk)) !== null) {
-    const [, filePath, fileContent] = newFileMatch;
+    const [, filePathRaw, fileContent] = newFileMatch;
+    const filePath = filePathRaw.trim();
 
     let fileData = fileContent;
     // Try to extract content from code blocks

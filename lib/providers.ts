@@ -73,6 +73,13 @@ export const MODELS = [
     companyName: "DeepSeek",
   },
   {
+    value: "deepseek-ai/DeepSeek-V3.2",
+    label: "DeepSeek V3.2",
+    logo: DeepSeekLogo,
+    companyName: "DeepSeek",
+    isNew: true,
+  },
+  {
     value: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
     label: "Qwen3 Coder 480B A35B Instruct",
     providers: ["novita", "hyperbolic"],
@@ -118,5 +125,5 @@ export const MODELS = [
     top_k: 40,
     temperature: 1.0,
     top_p: 0.95,
-  },
+  }
 ];
