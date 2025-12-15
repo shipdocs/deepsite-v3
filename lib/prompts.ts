@@ -21,10 +21,9 @@ https://enzostvs-cached-generation.hf.space/generate/[prompt]?[options]
 - format: square, portrait-3_4, portrait-9_16, landscape-16_9, landscape-4_3
 
 [Examples]:
-https://enzostvs-cached-generation.hf.space/generate/A beautiful sunset over a calm ocean with a small boat in the foreground?format=square
-https://enzostvs-cached-generation.hf.space/generate/A professional business meeting in a modern office with a large table and chairs?format=portrait-3_4
-https://enzostvs-cached-generation.hf.space/generate/A group of friends enjoying a sunny day at the beach?format=landscape-16_9
-https://enzostvs-cached-generation.hf.space/generate/A group of friends enjoying a sunny day at the beach?format=landscape-4_3
+https://enzostvs-cached-generation.hf.space/generate/a-cat-wearing-glasses
+https://enzostvs-cached-generation.hf.space/generate/sunset-over-mountains?format=landscape-16_9
+https://enzostvs-cached-generation.hf.space/generate/portrait-of-a-wizard?format=portrait-9_16
 `
 export const PROMPT_FOR_PROJECT_NAME = `REQUIRED: Generate a name for the project, based on the user's request. Try to be creative and unique. Add a emoji at the end of the name. It should be short, like 6 words. Be fancy, creative and funny. DON'T FORGET IT, IT'S IMPORTANT!`
 
