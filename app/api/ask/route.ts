@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
             ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
             ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
             ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
-            max_tokens: 32000,
+            max_tokens: 16_384,
           },
           billTo ? { billTo } : {}
         );
@@ -311,7 +311,7 @@ export async function PUT(request: NextRequest) {
             ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
             ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
             ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
-            max_tokens: 32000,
+            max_tokens: 16_384,
           },
           billTo ? { billTo } : {}
         );
