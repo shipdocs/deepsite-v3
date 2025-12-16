@@ -109,7 +109,12 @@ export async function GET(
     
     for await (const fileInfo of listFiles({repo, accessToken: user.token as string})) {
       if (fileInfo.path.endsWith(".html") || fileInfo.path.endsWith(".css") || fileInfo.path.endsWith(".js") || fileInfo.path.endsWith(".json")) {
-        const blob = await downloadFile({ repo, accessToken: user.token as string, path: fileInfo.path, raw: true });
+        const blob = await downloadFile({ repo, accessToken: user.token as string, path: fileInfo.path, raw: true }).catch((error) => {
+          return null;
+        });
+        if (!blob) {
+          continue;
+        }
         const html = await blob?.text();
         if (!html) {
           continue;
