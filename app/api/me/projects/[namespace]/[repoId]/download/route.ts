@@ -66,7 +66,12 @@ export async function GET(
           accessToken: user.token as string, 
           path: fileInfo.path, 
           raw: true 
+        }).catch((error) => {
+          return null;
         });
+        if (!blob) {
+          continue;
+        }
 
         if (blob) {
           const arrayBuffer = await blob.arrayBuffer();

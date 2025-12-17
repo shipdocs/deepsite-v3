@@ -136,7 +136,12 @@ export async function GET(
           if (allowedFilesExtensions.includes(subFileInfo.path.split(".").pop() || "")) {
             files.push(`https://huggingface.co/spaces/${namespace}/${repoId}/resolve/main/${subFileInfo.path}`);
           } else {
-            const blob = await downloadFile({ repo, accessToken: user.token as string, path: subFileInfo.path, raw: true });
+            const blob = await downloadFile({ repo, accessToken: user.token as string, path: subFileInfo.path, raw: true }).catch((error) => {
+              return null;
+            });
+            if (!blob) {
+              continue;
+            }
             const html = await blob?.text();
             if (!html) {
               continue;
