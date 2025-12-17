@@ -72,7 +72,12 @@ export async function POST(
           path: fileInfo.path, 
           revision: commitId,
           raw: true 
+        }).catch((error) => {
+          return null;
         });
+        if (!blob) {
+          continue;
+        }
         const content = await blob?.text();
         
         if (content) {
@@ -124,7 +129,12 @@ export async function POST(
               path: subFileInfo.path, 
               revision: commitId,
               raw: true 
+            }).catch((error) => {
+              return null;
             });
+            if (!blob) {
+              continue;
+            }
             const content = await blob?.text();
             
             if (content) {
