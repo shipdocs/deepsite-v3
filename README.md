@@ -11,16 +11,12 @@ failure_strategy: rollback
 short_description: Generate any application by Vibe Coding
 models:
   - deepseek-ai/DeepSeek-V3-0324
-  - deepseek-ai/DeepSeek-R1-0528
-  - deepseek-ai/DeepSeek-V3.1
-  - deepseek-ai/DeepSeek-V3.1-Terminus
-  - deepseek-ai/DeepSeek-V3.2-Exp
+  - deepseek-ai/DeepSeek-V3.2
   - Qwen/Qwen3-Coder-480B-A35B-Instruct
   - moonshotai/Kimi-K2-Instruct
   - moonshotai/Kimi-K2-Instruct-0905
-  - zai-org/GLM-4.6
-  - MiniMaxAI/MiniMax-M2
-  - moonshotai/Kimi-K2-Thinking
+  - zai-org/GLM-4.7
+  - MiniMaxAI/MiniMax-M2.1
 ---
 
 # DeepSite 🐳
