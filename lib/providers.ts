@@ -41,6 +41,15 @@ export const PROVIDERS = {
 
 export const MODELS = [
   {
+    value: "moonshotai/Kimi-K2.5",
+    label: "Kimi K2 Instruct",
+    providers: ["together", "novita", "groq"],
+    autoProvider: "groq",
+    logo: KimiLogo,
+    companyName: "Kimi",
+    isNew: true,
+  },
+  {
     value: "deepseek-ai/DeepSeek-V3-0324",
     label: "DeepSeek V3 O324",
     providers: ["fireworks-ai", "nebius", "sambanova", "novita", "hyperbolic"],
@@ -64,26 +73,18 @@ export const MODELS = [
     companyName: "Qwen",
   },
   {
-    value: "moonshotai/Kimi-K2-Instruct-0905",
-    label: "Kimi K2 Instruct",
-    providers: ["together", "novita", "groq"],
-    autoProvider: "groq",
-    logo: KimiLogo,
-    companyName: "Kimi",
-  },
-  {
     value: "zai-org/GLM-4.7",
     label: "GLM-4.7",
     logo: ZaiLogo,
     companyName: "Z.ai",
-    isNew: true,
+    isNew: false,
   },
   {
     value: "MiniMaxAI/MiniMax-M2.1",
     label: "MiniMax M2.1",
     logo: MiniMaxLogo,
     companyName: "MiniMax",
-    isNew: true,
+    isNew: false,
     top_k: 40,
     temperature: 1.0,
     top_p: 0.95,
