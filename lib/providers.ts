@@ -42,7 +42,7 @@ export const PROVIDERS = {
 export const MODELS = [
   {
     value: "moonshotai/Kimi-K2.5",
-    label: "Kimi K2 Instruct",
+    label: "Kimi K2.5",
     providers: ["together", "novita", "groq"],
     autoProvider: "groq",
     logo: KimiLogo,
@@ -62,7 +62,6 @@ export const MODELS = [
     label: "DeepSeek V3.2",
     logo: DeepSeekLogo,
     companyName: "DeepSeek",
-    isNew: true,
   },
   {
     value: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
