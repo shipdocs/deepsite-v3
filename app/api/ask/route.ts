@@ -95,18 +95,13 @@ export async function POST(request: NextRequest) {
 
     (async () => {
       try {
-        const client = new InferenceClient(token);
-        
         const systemPrompt = selectedModel.value.includes('MiniMax') 
           ? INITIAL_SYSTEM_PROMPT_LIGHT 
           : INITIAL_SYSTEM_PROMPT;
         
         const userPrompt = prompt;
-                
-        const chatCompletion = client.chatCompletionStream(
-          {
-            model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
-            messages: [
+
+        const messages: any[] = [
               {
                 role: "system",
                 content: systemPrompt,
@@ -121,24 +116,74 @@ export async function POST(request: NextRequest) {
 2. I want to use the following secondary color: ${enhancedSettings.secondaryColor} (eg: bg-${enhancedSettings.secondaryColor}-500).
 3. I want to use the following theme: ${enhancedSettings.theme} mode.` : "")
               },
-            ],
-            ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
-            ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
-            ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
-            max_tokens: 16_384,
-          },
-          billTo ? { billTo } : {}
-        );
+            ];
 
-        while (true) {
-          const { done, value } = await chatCompletion.next()
-          if (done) {
-            break;
+        if (process.env.LLM_BASE_URL) {
+          const res = await fetch(process.env.LLM_BASE_URL + "/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${process.env.LLM_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: process.env.LLM_MODEL || selectedModel.value,
+              messages: messages,
+              stream: true,
+              max_tokens: 16_384,
+              temperature: selectedModel.temperature || 0.7,
+              top_p: selectedModel.top_p || 0.7
+            })
+          });
+
+          if (!res.ok) throw new Error(`LLM Error: ${res.status} ${res.statusText}`);
+
+          const reader = res.body?.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader?.read() || { done: true, value: undefined };
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.trim().startsWith('data: ')) {
+                const data = line.trim().slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const json = JSON.parse(data);
+                  const content = json.choices[0]?.delta?.content;
+                  if (content) await writer.write(encoder.encode(content));
+                } catch (e) {}
+              }
+            }
           }
 
-          const chunk = value.choices[0]?.delta?.content;
-          if (chunk) {
-            await writer.write(encoder.encode(chunk));
+        } else {
+          const client = new InferenceClient(token);
+          const chatCompletion = client.chatCompletionStream(
+            {
+              model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
+              messages,
+              ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
+              ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
+              ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
+              max_tokens: 16_384,
+            },
+            billTo ? { billTo } : {}
+          );
+
+          while (true) {
+            const { done, value } = await chatCompletion.next()
+            if (done) {
+              break;
+            }
+
+            const chunk = value.choices[0]?.delta?.content;
+            if (chunk) {
+              await writer.write(encoder.encode(chunk));
+            }
           }
         }
         
@@ -277,8 +322,6 @@ export async function PUT(request: NextRequest) {
 
     (async () => {
       try {
-        const client = new InferenceClient(token);
-
         const basePrompt = selectedModel.value.includes('MiniMax') 
           ? FOLLOW_UP_SYSTEM_PROMPT_LIGHT 
           : FOLLOW_UP_SYSTEM_PROMPT;
@@ -295,10 +338,7 @@ export async function PUT(request: NextRequest) {
             : ""
           }. Current pages (${allPages.length} total): ${pagesContext}. ${files?.length > 0 ? `Available images: ${files?.map((f: string) => f).join(', ')}.` : ""}`;
 
-        const chatCompletion = client.chatCompletionStream(
-          {
-            model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
-            messages: [
+        const messages: any[] = [
               {
                 role: "system",
                 content: systemPrompt + assistantContext
@@ -307,25 +347,74 @@ export async function PUT(request: NextRequest) {
                 role: "user",
                 content: prompt,
               },
-            ],
-            ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
-            ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
-            ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
-            max_tokens: 16_384,
-          },
-          billTo ? { billTo } : {}
-        );
+            ];
 
-        // Stream the response chunks to the client
-        while (true) {
-          const { done, value } = await chatCompletion.next();
-          if (done) {
-            break;
+        if (process.env.LLM_BASE_URL) {
+          const res = await fetch(process.env.LLM_BASE_URL + "/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${process.env.LLM_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: process.env.LLM_MODEL || selectedModel.value,
+              messages: messages,
+              stream: true,
+              max_tokens: 16_384,
+              temperature: selectedModel.temperature || 0.7,
+              top_p: selectedModel.top_p || 0.7
+            })
+          });
+
+          if (!res.ok) throw new Error(`LLM Error: ${res.status} ${res.statusText}`);
+
+          const reader = res.body?.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader?.read() || { done: true, value: undefined };
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.trim().startsWith('data: ')) {
+                const data = line.trim().slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const json = JSON.parse(data);
+                  const content = json.choices[0]?.delta?.content;
+                  if (content) await writer.write(encoder.encode(content));
+                } catch (e) {}
+              }
+            }
           }
+        } else {
+          const client = new InferenceClient(token);
+          const chatCompletion = client.chatCompletionStream(
+            {
+              model: selectedModel.value + (provider !== "auto" ? `:${provider}` : ""),
+              messages,
+              ...(selectedModel.top_k ? { top_k: selectedModel.top_k } : {}),
+              ...(selectedModel.temperature ? { temperature: selectedModel.temperature } : {}),
+              ...(selectedModel.top_p ? { top_p: selectedModel.top_p } : {}),
+              max_tokens: 16_384,
+            },
+            billTo ? { billTo } : {}
+          );
 
-          const chunk = value.choices[0]?.delta?.content;
-          if (chunk) {
-            await writer.write(encoder.encode(chunk));
+          // Stream the response chunks to the client
+          while (true) {
+            const { done, value } = await chatCompletion.next();
+            if (done) {
+              break;
+            }
+
+            const chunk = value.choices[0]?.delta?.content;
+            if (chunk) {
+              await writer.write(encoder.encode(chunk));
+            }
           }
         }
 

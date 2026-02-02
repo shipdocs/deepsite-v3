@@ -8,6 +8,17 @@ type UserResponse = User & { token: string };
 
 export const isAuthenticated = async (): // req: NextRequest
 Promise<UserResponse | NextResponse<unknown> | undefined> => {
+  if (process.env.SKIP_AUTH === "true") {
+    return {
+      id: "local-user",
+      name: "Local User",
+      username: "local",
+      email: "local@example.com",
+      avatarUrl: "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y",
+      token: "local-token",
+    } as unknown as UserResponse; // cast to avoid type errors with missing props if any
+  }
+
   const authHeaders = await headers();
   const cookieStore = await cookies();
   const token = cookieStore.get(MY_TOKEN_KEY())?.value

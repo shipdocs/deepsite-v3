@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRepo, RepoDesignation, uploadFiles } from "@huggingface/hub";
+import fs from "fs-extra";
+import path from "path";
 
 import { isAuthenticated } from "@/lib/auth";
 import { Page } from "@/types";
@@ -11,6 +13,8 @@ import { pagesToFiles } from "@/lib/format-ai-response";
  * UPDATE route - for updating existing projects or creating new ones after AI streaming
  * This route handles the HuggingFace upload after client-side AI response processing
  */
+const LOCAL_PROJECTS_DIR = path.join(process.cwd(), "local-projects");
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ namespace: string; repoId: string }> }
@@ -32,6 +36,71 @@ export async function PUT(
   }
 
   try {
+    if (process.env.SKIP_AUTH === "true") {
+       let projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
+
+       if (isNew) {
+          const title = projectName || "DeepSite Project";
+          const formattedTitle = title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .split("-")
+            .filter(Boolean)
+            .join("-")
+            .slice(0, 96);
+          
+          repoId = formattedTitle;
+          projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
+          namespace = user.name;
+          
+          // Ensure directory exists
+          await fs.ensureDir(projectPath);
+
+           // Add README.md for new projects
+            const colorFrom = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const colorTo = COLORS[Math.floor(Math.random() * COLORS.length)];
+            const README = `---
+title: ${title}
+colorFrom: ${colorFrom}
+colorTo: ${colorTo}
+emoji: 🐳
+sdk: static
+pinned: false
+tags:
+  - deepsite-v3
+---
+
+# Welcome to your new DeepSite project!
+This project was created with [DeepSite](https://huggingface.co/deepsite).
+`;
+           await fs.writeFile(path.join(projectPath, "README.md"), README);
+       }
+
+       // Write pages to disk
+       for (const page of pages) {
+           let content = page.html;
+           // Inject badge only for index pages on create (same logic as HF)
+           if (isNew && page.path.endsWith(".html") && isIndexPage(page.path)) {
+               content = injectDeepSiteBadge(page.html);
+           }
+           
+           const filePath = path.join(projectPath, page.path);
+           await fs.ensureDir(path.dirname(filePath));
+           await fs.writeFile(filePath, content);
+       }
+       
+       return NextResponse.json({
+          ok: true,
+          pages,
+          repoId: `${namespace}/${repoId}`,
+          commit: {
+            title: commitTitle,
+            oid: "local-oid",
+            date: new Date(),
+          }
+        });
+    }
+
     let files: File[];
     
     if (isNew) {

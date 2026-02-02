@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RepoDesignation, spaceInfo, listFiles, deleteRepo, listCommits, downloadFile } from "@huggingface/hub";
+import fs from "fs-extra";
+import path from "path";
 
 import { isAuthenticated } from "@/lib/auth";
 import { Commit, Page } from "@/types";
+
+const LOCAL_PROJECTS_DIR = path.join(process.cwd(), "local-projects");
 
 export async function DELETE(
   req: NextRequest,
@@ -16,6 +20,16 @@ export async function DELETE(
 
   const param = await params;
   const { namespace, repoId } = param;
+
+  if (process.env.SKIP_AUTH === "true") {
+      const projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
+      if (await fs.pathExists(projectPath)) {
+        await fs.remove(projectPath);
+        return NextResponse.json({ ok: true }, { status: 200 });
+      } else {
+        return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
+      }
+  }
 
   try {
     const space = await spaceInfo({
@@ -70,6 +84,66 @@ export async function GET(
 
   const param = await params;
   const { namespace, repoId } = param;
+
+   if (process.env.SKIP_AUTH === "true") {
+      const projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
+      
+      if (!(await fs.pathExists(projectPath))) {
+          return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
+      }
+
+      const htmlFiles: Page[] = [];
+      const files: string[] = [];
+
+      async function readFilesRecursively(dir: string, baseDir: string) {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, "/"); // normalize path
+
+              if (entry.isDirectory()) {
+                 await readFilesRecursively(fullPath, baseDir);
+              } else {
+                if (entry.name.endsWith(".html") || entry.name.endsWith(".css") || entry.name.endsWith(".js") || entry.name.endsWith(".json")) {
+                   const content = await fs.readFile(fullPath, "utf-8");
+                   htmlFiles.push({ path: relativePath, html: content });
+                } else if (!relativePath.startsWith(".git") && !relativePath.startsWith("README.md")) {
+                   // Serving local files via API is complex without a static server, 
+                   // for now just list them. In a real local app, you might serve them via a different route.
+                   // For this MVP, we'll assume they are available if we had a file server, 
+                   // but here we just list them.
+                    files.push(relativePath); 
+                }
+              }
+          }
+      }
+
+      await readFilesRecursively(projectPath, projectPath);
+
+      // Local commits simulation (basic)
+      const commits: Commit[] = [{
+          title: "Initial Commit (Local)",
+          oid: "local-oid",
+          date: new Date(),
+      }];
+
+      return NextResponse.json(
+          {
+            project: {
+              id: repoId,
+              space_id: `${namespace}/${repoId}`,
+              private: true,
+              _updatedAt: new Date(),
+            },
+            pages: htmlFiles,
+            files: [], // Files listing is limited in local mode for now
+            commits,
+            ok: true,
+          },
+          { status: 200 }
+      );
+  }
+
 
   try {
     const space = await spaceInfo({

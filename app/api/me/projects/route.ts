@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RepoDesignation, createRepo, listCommits, spaceInfo, uploadFiles } from "@huggingface/hub";
+import fs from "fs-extra";
+import path from "path";
 
 import { isAuthenticated } from "@/lib/auth";
 import { Commit, Page } from "@/types";
@@ -25,6 +27,58 @@ export async function POST(
   .filter(Boolean)
   .join("-")
   .slice(0, 96);
+
+  if (process.env.SKIP_AUTH === "true") {
+      const LOCAL_PROJECTS_DIR = path.join(process.cwd(), "local-projects");
+      const projectPath = path.join(LOCAL_PROJECTS_DIR, formattedTitle);
+      
+      await fs.ensureDir(projectPath);
+      
+      const colorFrom = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const colorTo = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const README = `---
+title: ${title}
+colorFrom: ${colorFrom}
+colorTo: ${colorTo}
+emoji: 🐳
+sdk: static
+pinned: false
+tags:
+  - deepsite-v3
+---
+
+# Welcome to your new DeepSite project!
+This project was created with [DeepSite](https://huggingface.co/deepsite).
+`;  
+      await fs.writeFile(path.join(projectPath, "README.md"), README);
+      
+      const files: any[] = []; // for response structure
+      
+      for (const page of pages) {
+           let content = page.html;
+           // Inject badge only for index pages on create (same logic as HF)
+           if (page.path.endsWith(".html") && isIndexPage(page.path)) {
+               content = injectDeepSiteBadge(page.html);
+           }
+           
+           const filePath = path.join(projectPath, page.path);
+           await fs.ensureDir(path.dirname(filePath));
+           await fs.writeFile(filePath, content);
+      }
+      
+      const newProject = {
+          files: pages.map((p: any) => p.path),
+          pages,
+          commits: [{ title: "Initial Commit (Local)", oid: "local-oid", date: new Date() }],
+          project: {
+            id: formattedTitle,
+            space_id: `local-user/${formattedTitle}`,
+            _updatedAt: new Date(),
+          }
+      };
+
+      return NextResponse.json({ space: newProject, path: `local-user/${formattedTitle}`, ok: true }, { status: 201 });
+  }
 
   const repo: RepoDesignation = {
     type: "space",
