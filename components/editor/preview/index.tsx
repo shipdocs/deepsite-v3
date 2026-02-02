@@ -42,7 +42,8 @@ export const Preview = ({
     setPreviewPage,
     setLastSavedPages,
     hasUnsavedChanges,
-  } = useEditor();
+    projectRunnerData,
+  } = useEditor(namespace, repoId);
   const {
     isEditableModeEnabled,
     setSelectedElement,
@@ -297,7 +298,7 @@ export const Preview = ({
         const allJsContent = jsFiles
           .map(
             (file) =>
-              `<script data-injected-from="${file.path}">\n${file.html}\n</script>`
+              `<script type="module" data-injected-from="${file.path}">\n${file.html}\n</script>`
           )
           .join("\n");
 
@@ -766,7 +767,7 @@ export const Preview = ({
               </div>
             </div>
           )}
-          {!isNew && !currentCommit && (
+          {!isNew && !currentCommit && projectRunnerData?.status !== "running" && (
             <div className="top-0 left-0 right-0 z-20 bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-800 px-4 py-2 max-h-[40px] flex items-center justify-between gap-3 text-xs w-full">
               <div className="flex items-center gap-2 flex-1">
                 <TriangleAlert className="size-4 text-neutral-500 flex-shrink-0" />
@@ -796,7 +797,9 @@ export const Preview = ({
               }
             )}
             src={
-              currentCommit && project?.space_id && !project?.private
+              projectRunnerData?.url 
+                ? projectRunnerData.url
+                : currentCommit && project?.space_id && !project?.private
                 ? `https://${project?.space_id?.replaceAll(
                     "/",
                     "-"
@@ -804,13 +807,16 @@ export const Preview = ({
                 : undefined
             }
             srcDoc={
-              currentCommit
+              projectRunnerData?.url
+                ? undefined
+                : currentCommit
                 ? undefined
                 : isNew ||
                   hasUnsavedChanges ||
                   project?.private ||
-                  !project?.space_id
-                ? isNew
+                  !project?.space_id ||
+                  (process.env.NEXT_PUBLIC_SKIP_AUTH === "true" || project?.space_id?.toLowerCase().includes("local"))
+                ? isNew || hasUnsavedChanges || (process.env.NEXT_PUBLIC_SKIP_AUTH === "true" || project?.space_id?.toLowerCase().includes("local"))
                   ? throttledHtml || defaultHTML
                   : stableHtml
                 : stableHtml || defaultHTML
@@ -822,12 +828,17 @@ export const Preview = ({
                 hasUnsavedChanges ||
                 project?.private
               ) {
-                if (iframeRef?.current?.contentWindow?.document?.body) {
-                  iframeRef.current.contentWindow.document.body.scrollIntoView({
-                    block: isAiWorking ? "end" : "start",
-                    inline: "nearest",
-                    behavior: isAiWorking ? "instant" : "smooth",
-                  });
+                try {
+                  if (iframeRef?.current?.contentWindow?.document?.body) {
+                    iframeRef.current.contentWindow.document.body.scrollIntoView({
+                      block: isAiWorking ? "end" : "start",
+                      inline: "nearest",
+                      behavior: isAiWorking ? "instant" : "smooth",
+                    });
+                  }
+                } catch (e) {
+                  // Ignore cross-origin errors when runner is active
+                  console.debug("Could not scroll iframe (cross-origin)");
                 }
                 setupIframeListeners();
               }

@@ -12,16 +12,14 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ namespace: string; repoId: string }> }
 ) {
-  const user = await isAuthenticated();
-
-  if (user instanceof NextResponse || !user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-
   const param = await params;
   const { namespace, repoId } = param;
 
-  if (process.env.SKIP_AUTH === "true") {
+  const isLocal = process.env.SKIP_AUTH === "true" || 
+                  namespace?.toLowerCase() === "local user" || 
+                  namespace?.toLowerCase() === "local-user";
+
+  if (isLocal) {
       const projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
       if (await fs.pathExists(projectPath)) {
         await fs.remove(projectPath);
@@ -29,6 +27,12 @@ export async function DELETE(
       } else {
         return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
       }
+  }
+
+  const user = await isAuthenticated();
+
+  if (user instanceof NextResponse || !user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -76,16 +80,14 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ namespace: string; repoId: string }> }
 ) {
-  const user = await isAuthenticated();
-
-  if (user instanceof NextResponse || !user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-
   const param = await params;
   const { namespace, repoId } = param;
 
-   if (process.env.SKIP_AUTH === "true") {
+  const isLocal = process.env.SKIP_AUTH === "true" || 
+                  namespace?.toLowerCase() === "local user" || 
+                  namespace?.toLowerCase() === "local-user";
+
+   if (isLocal) {
       const projectPath = path.join(LOCAL_PROJECTS_DIR, repoId);
       
       if (!(await fs.pathExists(projectPath))) {
@@ -101,18 +103,19 @@ export async function GET(
               const fullPath = path.join(dir, entry.name);
               const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, "/"); // normalize path
 
+              // Skip noise directories
+              if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".next" || entry.name === "dist") {
+                  continue;
+              }
+
               if (entry.isDirectory()) {
                  await readFilesRecursively(fullPath, baseDir);
               } else {
-                if (entry.name.endsWith(".html") || entry.name.endsWith(".css") || entry.name.endsWith(".js") || entry.name.endsWith(".json")) {
+                if (entry.name.endsWith(".html") || entry.name.endsWith(".css") || entry.name.endsWith(".js") || entry.name.endsWith(".jsx") || entry.name.endsWith(".ts") || entry.name.endsWith(".tsx") || entry.name.endsWith(".json")) {
                    const content = await fs.readFile(fullPath, "utf-8");
                    htmlFiles.push({ path: relativePath, html: content });
-                } else if (!relativePath.startsWith(".git") && !relativePath.startsWith("README.md")) {
-                   // Serving local files via API is complex without a static server, 
-                   // for now just list them. In a real local app, you might serve them via a different route.
-                   // For this MVP, we'll assume they are available if we had a file server, 
-                   // but here we just list them.
-                    files.push(relativePath); 
+                } else {
+                   files.push(relativePath); 
                 }
               }
           }

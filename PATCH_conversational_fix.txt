@@ -1,0 +1,23 @@
+// PATCH FOR useAi.ts - Line 286-293
+// Replace the conversational content extraction block with this:
+
+// Extract conversational content (text before file markers OR entire response if no files)
+let conversationText = "";
+const conversationMatch = contentResponse.match(/([\s\S]*?)<<<<<<< NEW_FILE_START/);
+if (conversationMatch) {
+  // Text before files
+  conversationText = conversationMatch[1].trim();
+} else if (!contentResponse.includes('<<<<<<< NEW_FILE_START')) {
+  // No files generated, entire response is conversational
+  conversationText = contentResponse.trim();
+}
+
+if (conversationText && !conversationText.startsWith('{')) {
+  setAiConversation(conversationText);
+  // Add to chat history
+  setChatMessages([...chatMessages, {
+    role: "assistant",
+    content: conversationText,
+    timestamp: new Date()
+  }]);
+}

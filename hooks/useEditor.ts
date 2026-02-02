@@ -10,7 +10,13 @@ import { api } from "@/lib/api";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
 import { useUser } from "./useUser";
 
-export const useEditor = (namespace?: string, repoId?: string) => {
+import { useParams } from "next/navigation";
+
+export const useEditor = (namespaceParam?: string, repoIdParam?: string) => {
+  const params = useParams();
+  const namespace = namespaceParam || (params?.namespace as string);
+  const repoId = repoIdParam || (params?.repoId as string);
+
   const client = useQueryClient();
   const router = useRouter();
   const { token } = useUser();
@@ -45,6 +51,29 @@ export const useEditor = (namespace?: string, repoId?: string) => {
     gcTime: 0,
     enabled: !!namespace && !!repoId,
   });
+
+  const { data: projectRunnerData } = useQuery({
+    queryKey: ["editor.projectRunner", namespace, repoId],
+    queryFn: async () => {
+      // Logic for local mode only or when explicitly needed
+      if (!namespace || !repoId) return null;
+      try {
+        const response = await api.get(`/projects/${namespace}/${repoId}/runner`);
+        return response.data; 
+      } catch (e) {
+        return null;
+      }
+    },
+    // Poll every 2 seconds if status is "starting", otherwise stop (5 min default)
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      if (data?.status === 'starting') return 2000;
+      if (data?.status === 'running') return 5000; // Keep checking availability?
+      return false;
+    },
+    enabled: !!namespace && !!repoId,
+  });
+
   const setProject = (newProject: any) => {
     const { project, pages, files, commits } = newProject;
     if (pages?.length > 0) {
@@ -62,23 +91,26 @@ export const useEditor = (namespace?: string, repoId?: string) => {
   const { data: pages = [] } = useQuery<Page[]>({
     queryKey: ["editor.pages"],
     queryFn: async (): Promise<Page[]> => {
-      return [
-        {
-          path: "index.html",
-          html: defaultHTML,
-        },
-      ];
+      if (!namespace || !repoId) {
+        return [
+          {
+            path: "index.html",
+            html: defaultHTML,
+          },
+        ];
+      }
+      return [];
     },
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
     retry: false,
-    initialData: [
+    initialData: !namespace || !repoId ? [
       {
         path: "index.html",
         html: defaultHTML,
       },
-    ],
+    ] : [],
   });
   const setPages = (newPages: Page[] | ((prev: Page[]) => Page[])) => {
     if (typeof newPages === "function") {
@@ -368,5 +400,6 @@ export const useEditor = (namespace?: string, repoId?: string) => {
     isSaving: saveChangesMutation.isPending,
     lastSavedPages,
     setLastSavedPages,
+    projectRunnerData,
   };
 };

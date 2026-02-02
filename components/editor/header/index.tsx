@@ -25,9 +25,33 @@ import {
 } from "@/components/ui/tooltip";
 import { DiscordIcon } from "@/components/icons/discord";
 
-export function Header({ isNew }: { isNew: boolean }) {
-  const { project } = useEditor();
+export function Header({ 
+  isNew, 
+  namespace, 
+  repoId 
+}: { 
+  isNew: boolean;
+  namespace?: string;
+  repoId?: string;
+}) {
+  const { project, projectRunnerData } = useEditor(namespace, repoId);
   const { user, openLoginWindow } = useUser();
+  
+  const isLocal = process.env.NEXT_PUBLIC_SKIP_AUTH === "true" || 
+                  project?.space_id?.toLowerCase().includes("local user") ||
+                  project?.space_id?.toLowerCase().includes("local-user");
+
+  // Determine the preview URL: prioritize local dev server, then HuggingFace
+  const previewUrl = projectRunnerData?.url 
+    ? projectRunnerData.url
+    : isLocal
+    ? "#" // Fallback for local if runner is not ready
+    : project?.space_id
+    ? project.private
+      ? `https://huggingface.co/spaces/${project.space_id}`
+      : `https://${project.space_id.replaceAll("/", "-")}.static.hf.space`
+    : undefined;
+  
   return (
     <header className="border-b bg-neutral-950 dark:border-neutral-800 grid grid-cols-3 lg:flex items-center max-lg:gap-3 justify-between z-20">
       <div className="flex items-center justify-between lg:max-w-[600px] lg:w-full py-2 px-2 lg:px-3 lg:pl-6 gap-3">
@@ -104,16 +128,9 @@ export function Header({ isNew }: { isNew: boolean }) {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          {project?.space_id && (
+          {previewUrl && previewUrl !== "#" && (
             <Link
-              href={
-                project?.private
-                  ? `https://huggingface.co/spaces/${project.space_id}`
-                  : `https://${project.space_id.replaceAll(
-                      "/",
-                      "-"
-                    )}.static.hf.space`
-              }
+              href={previewUrl}
               target="_blank"
             >
               <Button

@@ -10,13 +10,14 @@ import { api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "./useUser";
 import { isTheSameHtml } from "@/lib/compare-html-diff";
+import { defaultHTML } from "@/lib/consts";
 
 export const useAi = (onScrollToBottom?: () => void) => {
   const client = useQueryClient();
   const audio = useRef<HTMLAudioElement | null>(null);
   const { setPages, setCurrentPage, setPreviewPage, setPrompts, prompts, pages, project, setProject, commits, setCommits, setLastSavedPages, isSameHtml } = useEditor();
   const [controller, setController] = useState<AbortController | null>(null);
-  const [storageProvider, setStorageProvider] = useLocalStorage("provider", "auto");
+  const [storageProvider, setStorageProvider] = useLocalStorage("provider", "zai-org");
   const [storageModel, setStorageModel] = useLocalStorage("model", MODELS[0].value);
   const router = useRouter();
   const { token } = useUser();
@@ -57,6 +58,36 @@ export const useAi = (onScrollToBottom?: () => void) => {
   });
   const setThinkingContent = (newThinkingContent: string) => {
     client.setQueryData(["ai.thinkingContent"], newThinkingContent);
+  };
+
+  const { data: aiConversation } = useQuery<string>({
+    queryKey: ["ai.conversation"],
+    queryFn: async () => "",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    initialData: ""
+  });
+  const setAiConversation = (newConversation: string) => {
+    client.setQueryData(["ai.conversation"], newConversation);
+  };
+
+  interface ChatMessage {
+    role: "user" | "assistant";
+    content: string;
+    timestamp: Date;
+  }
+
+  const { data: chatMessages } = useQuery<ChatMessage[]>({
+    queryKey: ["ai.chatMessages"],
+    queryFn: async () => [],
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    initialData: []
+  });
+  const setChatMessages = (newMessages: ChatMessage[]) => {
+    client.setQueryData(["ai.chatMessages"], newMessages);
   };
 
   const { data: selectedElement } = useQuery<HTMLElement | null>({
@@ -109,11 +140,11 @@ export const useAi = (onScrollToBottom?: () => void) => {
 
   const { data: provider } = useQuery({
     queryKey: ["ai.provider"],
-    queryFn: async () => storageProvider ?? "auto",
+    queryFn: async () => storageProvider ?? "zai-org",
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    initialData: storageProvider ?? "auto"
+    initialData: storageProvider ?? "zai-org"
   });
   const setProvider = (newProvider: string) => {
     setStorageProvider(newProvider);
@@ -138,6 +169,23 @@ export const useAi = (onScrollToBottom?: () => void) => {
   const setModel = (newModel: string) => {
     setStorageModel(newModel);
     client.setQueryData(["ai.model"], newModel);
+  };
+
+  const getConversationalText = (content: string) => {
+    // 1. Remove thinking tags
+    let text = content.replace(/<thinking?>[\s\S]*?<\/thinking?>/gi, '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    
+    // 2. Remove all file-related blocks
+    text = text
+      .replace(/<<<<<<< PROJECT_NAME_START[\s\S]*?>>>>>>> PROJECT_NAME_END/g, "")
+      .replace(/<<<<<<< NEW_FILE_START[\s\S]*?>>>>>>> NEW_FILE_END[\s\n]*```[\w]*[\s\S]*?```/g, "")
+      .replace(/<<<<<<< UPDATE_FILE_START[\s\S]*?>>>>>>> UPDATE_FILE_END[\s\n]*```[\w]*[\s\S]*?```/g, "")
+      // Fallback for blocks without code fences (unlikely but possible)
+      .replace(/<<<<<<< (NEW_FILE|UPDATE_FILE|PROJECT_NAME)_START[\s\S]*?>>>>>>> (NEW_FILE|UPDATE_FILE|PROJECT_NAME)_END/g, "")
+      .replace(/<<<<<<< SEARCH[\s\S]*?REPLACE_END/g, "")
+      .trim();
+
+    return text;
   };
 
   const createNewProject = async (prompt: string, htmlPages: Page[], projectName: string | undefined, isLoggedIn?: boolean, userName?: string) => {
@@ -184,7 +232,15 @@ export const useAi = (onScrollToBottom?: () => void) => {
     
     setIsAiWorking(true);
     setThinkingContent(""); // Reset thinking content
+    setAiConversation(""); // Reset conversation content
     streamingPagesRef.current.clear(); // Reset tracking for new generation
+    
+    // Add user message to chat history
+    setChatMessages([...chatMessages, {
+      role: "user",
+      content: prompt,
+      timestamp: new Date()
+    }]);
     
     const abortController = new AbortController();
     setController(abortController);
@@ -244,6 +300,19 @@ export const useAi = (onScrollToBottom?: () => void) => {
               } catch (e) {
               }
             }
+
+            // Extract conversational content
+            const conversationText = getConversationalText(contentResponse);
+            
+            if (conversationText) {
+              setAiConversation(conversationText);
+              // Add to chat history
+              setChatMessages([...chatMessages, {
+                role: "assistant",
+                content: conversationText,
+                timestamp: new Date()
+              }]);
+            }
             
             const newPages = formatPages(contentResponse, false);
             let projectName = contentResponse.match(/<<<<<<< PROJECT_NAME_START\s*([\s\S]*?)\s*>>>>>>> PROJECT_NAME_END/)?.[1]?.trim();
@@ -254,6 +323,10 @@ export const useAi = (onScrollToBottom?: () => void) => {
             setLastSavedPages([...newPages]);
             if (newPages.length > 0 && !isTheSameHtml(newPages[0].html)) {
               createNewProject(prompt, newPages, projectName, isLoggedIn, userName);
+            } else {
+              // No files generated (conversational response only), reset working state
+              setIsAiWorking(false);
+              if (audio.current) audio.current.play();
             }
             setPrompts([...prompts, prompt]);
 
@@ -415,6 +488,17 @@ export const useAi = (onScrollToBottom?: () => void) => {
               } catch (e) {
                 // Not JSON, continue with normal processing
               }
+            }
+
+            // Extract conversational content for follow-up
+            const conversationText = getConversationalText(contentResponse);
+            if (conversationText) {
+              setAiConversation(conversationText);
+              setChatMessages([...chatMessages, {
+                role: "assistant",
+                content: conversationText,
+                timestamp: new Date()
+              }]);
             }
             
             const { processAiResponse, extractProjectName } = await import("@/lib/format-ai-response");
@@ -580,7 +664,8 @@ export const useAi = (onScrollToBottom?: () => void) => {
         return;
       }
       const filePath = chunk.trim();
-      const fileContent = extractFileContent(fileChunks[index + 1], filePath);
+      const rawChunk = fileChunks[index + 1];
+      const fileContent = extractFileContent(rawChunk, filePath);
 
       if (fileContent) {
         const page: Page = {
@@ -597,8 +682,19 @@ export const useAi = (onScrollToBottom?: () => void) => {
         processedChunks.add(index + 1);
       }
     });
+
     if (pages.length > 0) {
-      setPages(pages);
+      // If we're starting a new project and only had the defaultHTML, clear it out.
+      const currentPages = client.getQueryData<Page[]>(["editor.pages"]) ?? [];
+      const hasOnlyDefault = currentPages.length === 1 && currentPages[0].html === defaultHTML;
+      
+      if (hasOnlyDefault) {
+        setPages(pages);
+      } else {
+        // Normal merge behavior for existing projects
+        setPages(pages);
+      }
+
       if (isStreaming) {
         const newPages = pages.filter(p => 
           !streamingPagesRef.current.has(p.path)
@@ -630,38 +726,72 @@ export const useAi = (onScrollToBottom?: () => void) => {
     
     let content = chunk.trim();
     
-    if (filePath.endsWith('.css')) {
-      const cssMatch = content.match(/```css\s*([\s\S]*?)\s*```/);
-      if (cssMatch) {
-        content = cssMatch[1];
-      } else {
-        content = content.replace(/^```css\s*/i, "");
-      }
-      return content.replace(/```/g, "").trim();
-    } else if (filePath.endsWith('.js')) {
-      const jsMatch = content.match(/```(?:javascript|js)\s*([\s\S]*?)\s*```/);
-      if (jsMatch) {
-        content = jsMatch[1];
-      } else {
-        content = content.replace(/^```(?:javascript|js)\s*/i, "");
-      }
-      return content.replace(/```/g, "").trim();
-    } else {
-      const htmlMatch = content.match(/```html\s*([\s\S]*?)\s*```/);
-      if (htmlMatch) {
-        content = htmlMatch[1];
-      } else {
-        content = content.replace(/^```html\s*/i, "");
-        const doctypeMatch = content.match(/<!DOCTYPE html>[\s\S]*/);
-        if (doctypeMatch) {
-          content = doctypeMatch[0];
+    // 1. Remove language marker if it's on the first line or joined with first word
+    const knownLanguages = ['json', 'javascript', 'js', 'typescript', 'ts', 'jsx', 'tsx', 'html', 'css', 'python', 'py', 'bash', 'shell'];
+    
+    // Check for "jsximport", "json{", etc.
+    for (const lang of knownLanguages) {
+      const regex = new RegExp(`^${lang}(\\s+|[\\{\\(\\[\\'\\"\\!\\/])`, 'i');
+      if (regex.test(content)) {
+        // If it was joined like "json{", we want to KEEP the "{"
+        const match = content.match(regex);
+        if (match) {
+           // If match[1] is whitespace, remove the whole thing including whitespace
+           // If match[1] is a symbol, remove only the language name
+           if (/\s/.test(match[1])) {
+             content = content.substring(match[0].length).trim();
+           } else {
+             content = content.substring(lang.length).trim();
+           }
         }
+        break;
       }
       
-      let htmlContent = content.replace(/```/g, "");
-      htmlContent = ensureCompleteHtml(htmlContent);
-      return htmlContent;
+      // Also check for language name on its own line
+      const firstLineRegex = new RegExp(`^${lang}\\s*\\n`, 'i');
+      if (firstLineRegex.test(content)) {
+        content = content.substring(content.indexOf('\n') + 1).trim();
+        break;
+      }
     }
+    
+    // 2. Handle Markdown Code Fences (remove ```json ... ```)
+    const codeFenceMatch = content.match(/```(?:\w+)?\s*([\s\S]*?)\s*```/);
+    if (codeFenceMatch) {
+      content = codeFenceMatch[1].trim();
+    } else {
+      content = content.replace(/^```(?:\w+)?\s*/i, "").replace(/```\s*$/i, "");
+    }
+    
+    // 3. Final cleanup based on file extension
+    if (filePath.endsWith('.json')) {
+      // Remove ANY trailing HTML tags that models sometimes append
+      content = content.replace(/<\/?[^>]+(>|$)/g, "").trim();
+      // Try to ensure it starts with { or [
+      const startJson = content.indexOf('{');
+      const startArray = content.indexOf('[');
+      const start = (startJson !== -1 && (startArray === -1 || startJson < startArray)) ? startJson : startArray;
+      if (start !== -1) {
+        content = content.substring(start);
+      }
+      const endJson = content.lastIndexOf('}');
+      const endArray = content.lastIndexOf(']');
+      const end = Math.max(endJson, endArray);
+      if (end !== -1) {
+        content = content.substring(0, end + 1);
+      }
+    } else if (filePath.endsWith('.html')) {
+      const doctypeMatch = content.match(/<!DOCTYPE html>[\s\S]*/i);
+      if (doctypeMatch) {
+        content = doctypeMatch[0];
+      }
+      content = ensureCompleteHtml(content.replace(/```/g, ""));
+    } else {
+       // Agressive cleanup for JS/CSS: remove trailing </html> if present
+       content = content.replace(/<\/html>\s*$/i, "").trim();
+    }
+    
+    return content.trim();
   };
 
   const ensureCompleteHtml = (html: string): string => {
@@ -716,5 +846,8 @@ export const useAi = (onScrollToBottom?: () => void) => {
     setProvider,
     selectedModel,
     audio,
+    aiConversation,
+    chatMessages,
+    setChatMessages,
   };
 }

@@ -55,8 +55,9 @@ export async function POST(request: NextRequest) {
    * and allows local testing without authentication.
    * This is useful for development and testing purposes.
    */
-  if (process.env.HF_TOKEN && process.env.HF_TOKEN.length > 0) {
-    token = process.env.HF_TOKEN;
+  if ((process.env.HF_TOKEN && process.env.HF_TOKEN.length > 0) || 
+      (process.env.LLM_API_KEY && process.env.LLM_API_KEY.length > 0)) {
+    token = process.env.HF_TOKEN || process.env.LLM_API_KEY;
   }
 
   const ip = authHeaders.get("x-forwarded-for")?.includes(",")

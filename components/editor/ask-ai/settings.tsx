@@ -73,7 +73,7 @@ export function Settings({
       !["auto", "fastest", "cheapest"].includes(provider as string) &&
       !providers.includes(provider as string)
     ) {
-      setProvider("auto");
+      setProvider("zai-org");
     }
   }, [model, provider]);
 
@@ -215,83 +215,9 @@ export function Settings({
             </div>
           )} */}
           <div className="flex flex-col gap-3">
-            <div>
-              <p className="text-neutral-300 text-sm mb-1">Provider Mode</p>
-              <p className="text-neutral-400 text-xs mb-3 leading-relaxed">
-                Choose how we select providers:{" "}
-                <span className="px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-500">
-                  Auto
-                </span>{" "}
-                (smart),{" "}
-                <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-500">
-                  Fastest
-                </span>{" "}
-                (speed), or{" "}
-                <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
-                  Cheapest
-                </span>{" "}
-                (cost).
-              </p>
-              <div className="grid grid-cols-3 gap-1 bg-neutral-800 p-1 rounded-full">
-                <button
-                  className={classNames(
-                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
-                    {
-                      "bg-white text-neutral-800": provider === "auto",
-                      "text-neutral-400 hover:text-neutral-200":
-                        provider !== "auto",
-                    }
-                  )}
-                  onClick={() => setProvider("auto")}
-                >
-                  <Sparkles
-                    className={classNames("size-3.5 mb-0.5", {
-                      "text-pink-400": provider !== "auto",
-                    })}
-                  />
-                  <span className="text-[10px] font-medium">Auto</span>
-                </button>
-                <button
-                  className={classNames(
-                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
-                    {
-                      "bg-white text-neutral-800": provider === "fastest",
-                      "text-neutral-400 hover:text-neutral-200":
-                        provider !== "fastest",
-                    }
-                  )}
-                  onClick={() => setProvider("fastest")}
-                >
-                  <Zap
-                    className={classNames("size-3.5 mb-0.5", {
-                      "text-yellow-400": provider !== "fastest",
-                    })}
-                  />
-                  <span className="text-[10px] font-medium">Fastest</span>
-                </button>
-                <button
-                  className={classNames(
-                    "flex flex-col items-center justify-center cursor-pointer py-1.5 rounded-full transition-all duration-200",
-                    {
-                      "bg-white text-neutral-800": provider === "cheapest",
-                      "text-neutral-400 hover:text-neutral-200":
-                        provider !== "cheapest",
-                    }
-                  )}
-                  onClick={() => setProvider("cheapest")}
-                >
-                  <DollarSign
-                    className={classNames("size-3.5 mb-0.5", {
-                      "text-green-400": provider !== "cheapest",
-                    })}
-                  />
-                  <span className="text-[10px] font-medium">Cheapest</span>
-                </button>
-              </div>
-            </div>
             <label className="block">
               <p className="text-neutral-300 text-sm mb-2">
-                Or choose a specific provider
+                Choose a provider
               </p>
               <div className="grid grid-cols-2 gap-1.5 relative">
                 {loadingProviders ? (

@@ -23,6 +23,7 @@ import { useProModal } from "@/components/contexts/pro-context";
 import { MAX_FREE_PROJECTS } from "@/lib/utils";
 import { PROMPTS_FOR_AI } from "@/lib/prompts";
 import { SelectedRedesignUrl } from "./selected-redesign-url";
+import { ChatHistory } from "./chat-history";
 
 export const AskAi = ({
   project,
@@ -40,6 +41,8 @@ export const AskAi = ({
     isAiWorking,
     isThinking,
     thinkingContent,
+    aiConversation,
+    chatMessages,
     selectedFiles,
     setSelectedFiles,
     selectedElement,
@@ -169,6 +172,7 @@ export const AskAi = ({
   return (
     <div className="p-3 w-full">
       <div className="relative bg-neutral-800 border border-neutral-700 rounded-2xl ring-[4px] focus-within:ring-neutral-500/30 focus-within:border-neutral-600 ring-transparent z-20 w-full group">
+        <ChatHistory messages={chatMessages || []} isAiWorking={isAiWorking} />
         {thinkingContent && (
           <div className="w-full border-b border-neutral-700 relative overflow-hidden">
             <header
