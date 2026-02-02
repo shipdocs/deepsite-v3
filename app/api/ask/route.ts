@@ -119,7 +119,11 @@ export async function POST(request: NextRequest) {
             ];
 
         if (process.env.LLM_BASE_URL) {
-          const res = await fetch(process.env.LLM_BASE_URL + "/chat/completions", {
+          const url = process.env.LLM_BASE_URL.endsWith("/") 
+              ? process.env.LLM_BASE_URL + "chat/completions" 
+              : process.env.LLM_BASE_URL + "/chat/completions";
+
+          const res = await fetch(url, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -350,7 +354,11 @@ export async function PUT(request: NextRequest) {
             ];
 
         if (process.env.LLM_BASE_URL) {
-          const res = await fetch(process.env.LLM_BASE_URL + "/chat/completions", {
+          const url = process.env.LLM_BASE_URL.endsWith("/") 
+              ? process.env.LLM_BASE_URL + "chat/completions" 
+              : process.env.LLM_BASE_URL + "/chat/completions";
+          
+          const res = await fetch(url, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
